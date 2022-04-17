@@ -32,9 +32,13 @@ func Run(ctx context.Context) error {
 		}
 	}()
 
-	err := tui.Run([]tui.View{repoView, codeView}, tui.Option{
-		Style:  tui.CellStyle{F256: 255, B256: 0},
-		Footer: &github.FooterModel{},
+	err := tui.Run(map[string]tui.View{
+		"repo": repoView,
+		"code": codeView,
+	}, tui.Options{
+		DefaultViewName: "repo",
+		Style:           tui.CellStyle{F256: 255, B256: 0},
+		Footer:          &github.FooterModel{},
 	}, github.Channel)
 	if err != nil {
 		return fmt.Errorf("an error has occured while running tui: %w", err)

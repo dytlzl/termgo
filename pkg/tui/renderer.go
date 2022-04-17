@@ -16,6 +16,7 @@ type Renderer struct {
 	eventChan chan interface{}
 	ttyin     *os.File
 	oldState  *term.State
+	shouldSkipRendering bool
 }
 
 func NewRenderer() (*Renderer, error) {

@@ -2,7 +2,6 @@ package example
 
 import (
 	"fmt"
-	"reflect"
 
 	"github.com/dytlzl/tervi/pkg/key"
 	"github.com/dytlzl/tervi/pkg/tui"
@@ -15,11 +14,7 @@ type ColorCodeView struct {
 	position int
 }
 
-func (ColorCodeView) Title() string {
-	return "256 Color Codes"
-}
-
-func (m *ColorCodeView) HandleEvent(event interface{}, state *tui.GlobalState) {
+func (m *ColorCodeView) HandleEvent(event interface{}) string {
 	switch typed := event.(type) {
 	case rune:
 		switch typed {
@@ -40,12 +35,13 @@ func (m *ColorCodeView) HandleEvent(event interface{}, state *tui.GlobalState) {
 				m.position += 16
 			}
 		case key.Esc:
-			state.FocusedModelType = reflect.TypeOf(&MenuView{})
+			return (*MenuView).Options(nil).Title
 		}
 	}
+	return ""
 }
 
-func (m ColorCodeView) Body(bool, *tui.GlobalState) []tui.Text {
+func (m *ColorCodeView) Body(bool, tui.Size) []tui.Text {
 	var slice []tui.Text
 	for i := 0; i < 16; i++ {
 		for j := 0; j < 16; j++ {
@@ -60,4 +56,10 @@ func (m ColorCodeView) Body(bool, *tui.GlobalState) []tui.Text {
 		slice = append(slice, tui.Text{Str: "\n", Style: style})
 	}
 	return slice
+}
+
+func (*ColorCodeView) Options() tui.ViewOptions {
+	return tui.ViewOptions{
+		Title: "256 Color Codes",
+	}
 }

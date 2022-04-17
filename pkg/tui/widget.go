@@ -16,9 +16,9 @@ type widget struct {
 	paddingV int
 }
 
-type widgetStyle struct {
-	x int
-	y int
+type Size struct {
+	Width  int
+	Height int
 }
 
 func newWidget(renderer *Renderer, x, y, width, height, paddingH, paddingV int) (*widget, error) {

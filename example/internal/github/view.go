@@ -2,7 +2,6 @@ package github
 
 import (
 	"fmt"
-	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -16,7 +15,6 @@ import (
 const channelSize = 64
 
 type RepoSearchView struct {
-	tui.DefaultView
 	Result             RepositorySearchResult
 	SearchInputCh      chan SearchInput
 	ReadMeInputCh      chan RepositoryWithOrigin
@@ -47,7 +45,7 @@ func (m *RepoSearchView) Title() string {
 	return "Repository Search"
 }
 
-func (m *RepoSearchView) Body(bool, *tui.GlobalState) []tui.Text {
+func (m *RepoSearchView) Body(bool, tui.Size) []tui.Text {
 	style := tui.CellStyle{F256: 255, B256: 0}
 	cursorStyle := tui.CellStyle{F256: 93, B256: style.F256, HasCursor: true}
 
@@ -93,7 +91,7 @@ func (m *RepoSearchView) Body(bool, *tui.GlobalState) []tui.Text {
 	return slice
 }
 
-func (m *RepoSearchView) HandleEvent(event interface{}, state *tui.GlobalState) {
+func (m *RepoSearchView) HandleEvent(event interface{}) string {
 	switch typed := event.(type) {
 	case RepositorySearchResult:
 		if typed.CreatedAt.UnixMicro() > m.Result.CreatedAt.UnixMicro() {
@@ -104,7 +102,7 @@ func (m *RepoSearchView) HandleEvent(event interface{}, state *tui.GlobalState) 
 	case rune:
 		switch typed {
 		case key.CtrlS:
-			state.FocusedModelType = reflect.TypeOf(&CodeSearchView{})
+			return "code"
 		case key.CtrlL:
 			if m.selectedRepository < len(m.Result.Repositories) {
 				go OpenRepository(m.Result.Repositories[m.selectedRepository].HtmlUrl)
@@ -139,7 +137,7 @@ func (m *RepoSearchView) HandleEvent(event interface{}, state *tui.GlobalState) 
 			}
 			m.lastStrokeTime = time.Now()
 		case key.Esc:
-			state.ShouldTerminate = true
+			Channel <- tui.Terminate
 		default:
 			m.input = m.input[:m.position] + string(typed) + m.input[m.position:]
 			m.position += utf8.RuneLen(typed)
@@ -156,6 +154,7 @@ func (m *RepoSearchView) HandleEvent(event interface{}, state *tui.GlobalState) 
 		Channel <- FooterMessage{Payload: ""}
 		m.IsSearching = false
 	}
+	return ""
 }
 
 func (m *RepoSearchView) SubViews() []tui.View {
@@ -175,6 +174,13 @@ func (m *RepoSearchView) SubViews() []tui.View {
 	return nil
 }
 
+func (m *RepoSearchView) Options() tui.ViewOptions {
+	return tui.ViewOptions{
+		Title:    m.Title(),
+		SubViews: m.SubViews(),
+	}
+}
+
 type RepoSubView struct {
 	tui.DefaultView
 	repo   RepositoryWithOrigin
@@ -185,7 +191,7 @@ func (m *RepoSubView) Title() string {
 	return m.repo.FullName
 }
 
-func (m *RepoSubView) Body(bool, *tui.GlobalState) []tui.Text {
+func (m *RepoSubView) Body(bool, tui.Size) []tui.Text {
 	style := tui.CellStyle{F256: 255, B256: 0}
 	keyStyle := tui.CellStyle{F256: 135, B256: style.B256}
 	slice := make([]tui.Text, 0, 5)
@@ -202,8 +208,14 @@ func (m *RepoSubView) Body(bool, *tui.GlobalState) []tui.Text {
 	return slice
 }
 
+func (m *RepoSubView) Options() tui.ViewOptions {
+	return tui.ViewOptions{
+		Title: m.Title(),
+		Width: tui.NewFraction(2, 3),
+	}
+}
+
 type CodeSearchView struct {
-	tui.DefaultView
 	Result            CodeSearchResult
 	SearchInputCh     chan SearchInput
 	ContentInputCh    chan github.SearchResultItem
@@ -235,7 +247,7 @@ func (m *CodeSearchView) Title() string {
 	return "Code Search"
 }
 
-func (m *CodeSearchView) Body(_ bool, state *tui.GlobalState) []tui.Text {
+func (m *CodeSearchView) Body(_ bool, size tui.Size) []tui.Text {
 	style := tui.CellStyle{F256: 255, B256: 0}
 	cursorStyle := tui.CellStyle{F256: 93, B256: style.F256, HasCursor: true}
 
@@ -269,10 +281,10 @@ func (m *CodeSearchView) Body(_ bool, state *tui.GlobalState) []tui.Text {
 				lastOrigin = item.Origin()
 			}
 			path := item.Path
-			if state.Width/3-len(item.Repository.FullName)-15 < 0 {
+			if size.Width/3-len(item.Repository.FullName)-15 < 0 {
 				path = ""
-			} else if len(path) > state.Width/3-len(item.Repository.FullName)-15 {
-				for len(path) > state.Width/3-len(item.Repository.FullName)-15 {
+			} else if len(path) > size.Width/3-len(item.Repository.FullName)-15 {
+				for len(path) > size.Width/3-len(item.Repository.FullName)-15 {
 					_, size := utf8.DecodeLastRuneInString(path)
 					path = path[:len(path)-size]
 				}
@@ -293,7 +305,7 @@ func (m *CodeSearchView) Body(_ bool, state *tui.GlobalState) []tui.Text {
 	return slice
 }
 
-func (m *CodeSearchView) HandleEvent(event interface{}, state *tui.GlobalState) {
+func (m *CodeSearchView) HandleEvent(event interface{}) string {
 	switch typed := event.(type) {
 	case CodeSearchResult:
 		if typed.CreatedAt.UnixMicro() > m.Result.CreatedAt.UnixMicro() {
@@ -304,7 +316,7 @@ func (m *CodeSearchView) HandleEvent(event interface{}, state *tui.GlobalState) 
 	case rune:
 		switch typed {
 		case key.CtrlS:
-			state.FocusedModelType = reflect.TypeOf(&RepoSearchView{})
+			return "repo"
 		case key.Enter:
 			if m.selectedItem < len(m.Result.Items) {
 				go OpenUrl(m.Result.Items[m.selectedItem].HtmlUrl)
@@ -333,7 +345,7 @@ func (m *CodeSearchView) HandleEvent(event interface{}, state *tui.GlobalState) 
 			}
 			m.lastStrokeTime = time.Now()
 		case key.Esc:
-			state.ShouldTerminate = true
+			Channel <- tui.Terminate
 		default:
 			m.input = m.input[:m.position] + string(typed) + m.input[m.position:]
 			m.position += utf8.RuneLen(typed)
@@ -350,6 +362,7 @@ func (m *CodeSearchView) HandleEvent(event interface{}, state *tui.GlobalState) 
 		Channel <- FooterMessage{Payload: ""}
 		m.IsSearching = false
 	}
+	return ""
 }
 
 func (m *CodeSearchView) SubViews() []tui.View {
@@ -366,6 +379,13 @@ func (m *CodeSearchView) SubViews() []tui.View {
 	return nil
 }
 
+func (m *CodeSearchView) Options() tui.ViewOptions {
+	return tui.ViewOptions{
+		Title:    m.Title(),
+		SubViews: m.SubViews(),
+	}
+}
+
 type CodeSubView struct {
 	tui.DefaultView
 	content  string
@@ -378,9 +398,9 @@ func (m *CodeSubView) Title() string {
 	return m.item.Path
 }
 
-func (m *CodeSubView) Body(_ bool, state *tui.GlobalState) []tui.Text {
+func (m *CodeSubView) Body(_ bool, size tui.Size) []tui.Text {
 	if m.runeMode {
-		return m.Body_RuneMode(false, nil)
+		return m.Body_RuneMode(false)
 	}
 	if m.content == "" {
 		return []tui.Text{{Str: "Loading...", Style: tui.CellStyle{F256: 135, B256: 0}}}
@@ -400,8 +420,8 @@ func (m *CodeSubView) Body(_ bool, state *tui.GlobalState) []tui.Text {
 	if col == -1 {
 		row = 0
 	}
-	beginRow := row - state.Height/2
-	endRow := row + state.Height/2
+	beginRow := row - size.Height/2
+	endRow := row + size.Height/2
 	if beginRow < 0 {
 		endRow -= beginRow
 		beginRow = 0
@@ -429,7 +449,7 @@ func (m *CodeSubView) Body(_ bool, state *tui.GlobalState) []tui.Text {
 	return slice
 }
 
-func (m *CodeSubView) Body_RuneMode(bool, *tui.GlobalState) []tui.Text {
+func (m *CodeSubView) Body_RuneMode(bool) []tui.Text {
 	if m.content == "" {
 		return []tui.Text{{Str: "Loading...", Style: tui.CellStyle{F256: 135, B256: 0}}}
 	}
@@ -447,6 +467,13 @@ func (m *CodeSubView) Body_RuneMode(bool, *tui.GlobalState) []tui.Text {
 	return slice
 }
 
+func (m *CodeSubView) Options() tui.ViewOptions {
+	return tui.ViewOptions{
+		Title: m.Title(),
+		Width: tui.NewFraction(2, 3),
+	}
+}
+
 type FooterModel struct {
 	message        string
 	MessageChannel chan string
@@ -460,9 +487,10 @@ func (f *FooterModel) Text() []tui.Text {
 	return []tui.Text{{Str: f.message, Style: f.Style()}}
 }
 
-func (f *FooterModel) HandleEvent(event interface{}, state *tui.GlobalState) {
+func (f *FooterModel) HandleEvent(event interface{}) string {
 	switch typed := event.(type) {
 	case FooterMessage:
 		f.message = typed.Payload
 	}
+	return ""
 }

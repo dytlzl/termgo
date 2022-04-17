@@ -25,9 +25,10 @@ type CellStyle struct {
 	HasCursor  bool
 }
 
-type Option struct {
-	Style  CellStyle
-	Footer FooterView
+type Options struct {
+	DefaultViewName string
+	Style           CellStyle
+	Footer          FooterView
 }
 
 var DefaultStyle = CellStyle{}

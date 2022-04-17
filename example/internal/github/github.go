@@ -189,5 +189,5 @@ func terminateWithError(out chan interface{}, err error) {
 	Finalize = func() {
 		fmt.Println(err)
 	}
-	out <- tui.Terminate{}
+	out <- tui.Terminate
 }

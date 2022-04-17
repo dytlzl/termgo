@@ -6,16 +6,28 @@ import (
 )
 
 func main() {
-	menu := &example.MenuView{}
-	models := []tui.View{
-		menu,
+	menu := &example.MenuView{
+		Channel: make(chan interface{}),
+	}
+	menu.Tabs = []tui.View{
 		&example.ColorCodeView{},
 		&example.DograMagraView{},
 		&example.KeyCodeView{},
 		&example.NoteView{},
 	}
-	menu.Tabs = models[1:]
+	views := map[string]tui.View{
+		menu.Options().Title: menu,
+	}
+	for _, view := range menu.Tabs {
+		views[view.Options().Title] = view
+	}
 	tui.Run(
-		models,
-		tui.Option{Style: tui.CellStyle{F256: 255, B256: 53}, Footer: &example.Footer{}}, nil)
+		views,
+		tui.Options{
+			DefaultViewName: menu.Options().Title,
+			Style:           tui.CellStyle{F256: 255, B256: 53},
+			Footer:          &example.Footer{},
+		},
+		menu.Channel,
+	)
 }

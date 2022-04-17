@@ -1,7 +1,6 @@
 package example
 
 import (
-	"reflect"
 	"unicode/utf8"
 
 	"github.com/dytlzl/tervi/pkg/key"
@@ -9,16 +8,11 @@ import (
 )
 
 type NoteView struct {
-	tui.DefaultView
 	position int
 	input    string
 }
 
-func (n NoteView) Title() string {
-	return "Note"
-}
-
-func (n NoteView) Body(hasFocus bool, _ *tui.GlobalState) []tui.Text {
+func (n *NoteView) Body(hasFocus bool, _ tui.Size) []tui.Text {
 	style := tui.CellStyle{F256: 255, B256: 53}
 	cursorStyle := tui.CellStyle{F256: style.B256, B256: style.F256, HasCursor: true}
 	if hasFocus {
@@ -48,7 +42,7 @@ func (n NoteView) Body(hasFocus bool, _ *tui.GlobalState) []tui.Text {
 	}
 }
 
-func (n *NoteView) HandleEvent(event interface{}, state *tui.GlobalState) {
+func (n *NoteView) HandleEvent(event interface{}) string {
 	switch typed := event.(type) {
 	case rune:
 		switch typed {
@@ -72,10 +66,17 @@ func (n *NoteView) HandleEvent(event interface{}, state *tui.GlobalState) {
 				n.position -= size
 			}
 		case key.Esc:
-			state.FocusedModelType = reflect.TypeOf(&MenuView{})
+			return (*MenuView).Options(nil).Title
 		default:
 			n.input = n.input[:n.position] + string(typed) + n.input[n.position:]
 			n.position += utf8.RuneLen(typed)
 		}
+	}
+	return ""
+}
+
+func (*NoteView) Options() tui.ViewOptions {
+	return tui.ViewOptions{
+		Title: "Note",
 	}
 }

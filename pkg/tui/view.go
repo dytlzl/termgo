@@ -1,54 +1,43 @@
 package tui
 
 type View interface {
-	Title() string
-	Body(hasFocus bool, state *GlobalState) []Text
-	HandleEvent(event interface{}, state *GlobalState)
-	BorderStyle() *CellStyle
-	SubViews() []View
-	Width() (int, int)
+	Body(hasFocus bool, size Size) []Text
+	HandleEvent(event interface{}) (newFocus string)
+	Options() ViewOptions
 }
 
-type ViewStyle struct {
-	borderStyle CellStyle
-	width       Fraction
-}
-
-type Fraction struct {
-	numerator   int
-	denominator int
+type ViewOptions struct {
+	Title       string
+	SubViews    []View
+	BorderStyle *CellStyle
+	Width       *Fraction
 }
 
 type FooterView interface {
 	Text() []Text
 	Style() CellStyle
-	HandleEvent(event interface{}, state *GlobalState)
+	HandleEvent(event interface{}) (newFocus string)
 }
 
 type DefaultView struct {
 }
 
-func (*DefaultView) Title() string {
+func (*DefaultView) Body(bool, Size) []Text {
+	return nil
+}
+
+func (*DefaultView) HandleEvent(interface{}) string {
 	return ""
 }
 
-func (*DefaultView) Body(bool, *GlobalState) []Text {
-	return nil
+func (*DefaultView) Options() ViewOptions {
+	return ViewOptions{
+		Title:       "",
+		SubViews:    nil,
+		BorderStyle: nil,
+		Width:       NewFraction(2, 3),
+	}
 }
 
-func (*DefaultView) HandleEvent(interface{}, *GlobalState) {
-}
-
-func (*DefaultView) BorderStyle() *CellStyle {
-	return nil
-}
-
-func (*DefaultView) SubViews() []View {
-	return nil
-}
-
-// Width returns the numerator and the denominator of the width of a view
-// math.big.Rat is not suitable, therefore this returns two int values.
-func (*DefaultView) Width() (int, int) {
-	return 2, 3
-}
+// Check if *DefaultView implements View
+var _ View = new(DefaultView)

@@ -15,5 +15,6 @@ func (Footer) Style() tui.CellStyle {
 	return tui.CellStyle{F256: 255, B256: 171}
 }
 
-func (Footer) HandleEvent(interface{}, *tui.GlobalState) {
+func (Footer) HandleEvent(interface{}) string {
+	return ""
 }
