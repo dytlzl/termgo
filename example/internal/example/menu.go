@@ -11,7 +11,7 @@ type MenuView struct {
 	currentTabNumber int
 }
 
-func (m MenuView) Body(bool, tui.Size) []tui.Text {
+func (m *MenuView) Body(bool, tui.Size) []tui.Text {
 	var style = tui.CellStyle{F256: 218, B256: 53}
 	var whiteStyle = tui.CellStyle{F256: 255, B256: 53}
 	var slice []tui.Text
