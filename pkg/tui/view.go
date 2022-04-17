@@ -2,7 +2,7 @@ package tui
 
 type View interface {
 	Body(hasFocus bool, size Size) []Text
-	HandleEvent(event interface{}) (newFocus string)
+	HandleEvent(event interface{}) interface{}
 	Options() ViewOptions
 }
 
@@ -16,7 +16,7 @@ type ViewOptions struct {
 type FooterView interface {
 	Text() []Text
 	Style() CellStyle
-	HandleEvent(event interface{}) (newFocus string)
+	HandleEvent(event interface{}) interface{}
 }
 
 type DefaultView struct {
@@ -26,8 +26,8 @@ func (*DefaultView) Body(bool, Size) []Text {
 	return nil
 }
 
-func (*DefaultView) HandleEvent(interface{}) string {
-	return ""
+func (*DefaultView) HandleEvent(interface{}) interface{} {
+	return nil
 }
 
 func (*DefaultView) Options() ViewOptions {

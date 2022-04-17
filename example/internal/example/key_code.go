@@ -18,7 +18,7 @@ func (k *KeyCodeView) Body(bool, tui.Size) []tui.Text {
 	return slice
 }
 
-func (k *KeyCodeView) HandleEvent(event interface{}) string {
+func (k *KeyCodeView) HandleEvent(event interface{}) interface{} {
 	if k.codes == nil {
 		k.codes = make([]rune, 0)
 	}
@@ -26,7 +26,7 @@ func (k *KeyCodeView) HandleEvent(event interface{}) string {
 	case rune:
 		k.codes = append(k.codes, typed)
 	}
-	return ""
+	return nil
 }
 
 func (*KeyCodeView) Options() tui.ViewOptions {

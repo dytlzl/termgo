@@ -14,7 +14,7 @@ type ColorCodeView struct {
 	position int
 }
 
-func (m *ColorCodeView) HandleEvent(event interface{}) string {
+func (m *ColorCodeView) HandleEvent(event interface{}) interface{} {
 	switch typed := event.(type) {
 	case rune:
 		switch typed {
@@ -38,7 +38,7 @@ func (m *ColorCodeView) HandleEvent(event interface{}) string {
 			return (*MenuView).Options(nil).Title
 		}
 	}
-	return ""
+	return nil
 }
 
 func (m *ColorCodeView) Body(bool, tui.Size) []tui.Text {

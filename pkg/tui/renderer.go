@@ -8,14 +8,14 @@ import (
 )
 
 type Renderer struct {
-	width     int
-	height    int
-	rows      [][]Cell
-	cursorX   int
-	cursorY   int
-	eventChan chan interface{}
-	ttyin     *os.File
-	oldState  *term.State
+	width               int
+	height              int
+	rows                [][]Cell
+	cursorX             int
+	cursorY             int
+	eventChan           chan interface{}
+	ttyin               *os.File
+	oldState            *term.State
 	shouldSkipRendering bool
 }
 

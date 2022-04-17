@@ -28,7 +28,7 @@ func (m *MenuView) Body(bool, tui.Size) []tui.Text {
 	return slice
 }
 
-func (m *MenuView) HandleEvent(event interface{}) string {
+func (m *MenuView) HandleEvent(event interface{}) interface{} {
 	switch typed := event.(type) {
 	case rune:
 		switch typed {
@@ -43,10 +43,10 @@ func (m *MenuView) HandleEvent(event interface{}) string {
 		case key.Enter:
 			return m.Tabs[m.currentTabNumber].Options().Title
 		case key.Esc:
-			m.Channel <- tui.Terminate
+			return tui.Terminate
 		}
 	}
-	return ""
+	return nil
 }
 
 func (m *MenuView) Options() tui.ViewOptions {

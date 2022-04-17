@@ -42,7 +42,7 @@ func (n *NoteView) Body(hasFocus bool, _ tui.Size) []tui.Text {
 	}
 }
 
-func (n *NoteView) HandleEvent(event interface{}) string {
+func (n *NoteView) HandleEvent(event interface{}) interface{} {
 	switch typed := event.(type) {
 	case rune:
 		switch typed {
@@ -72,7 +72,7 @@ func (n *NoteView) HandleEvent(event interface{}) string {
 			n.position += utf8.RuneLen(typed)
 		}
 	}
-	return ""
+	return nil
 }
 
 func (*NoteView) Options() tui.ViewOptions {

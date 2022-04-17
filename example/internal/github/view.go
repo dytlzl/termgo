@@ -91,7 +91,7 @@ func (m *RepoSearchView) Body(bool, tui.Size) []tui.Text {
 	return slice
 }
 
-func (m *RepoSearchView) HandleEvent(event interface{}) string {
+func (m *RepoSearchView) HandleEvent(event interface{}) interface{} {
 	switch typed := event.(type) {
 	case RepositorySearchResult:
 		if typed.CreatedAt.UnixMicro() > m.Result.CreatedAt.UnixMicro() {
@@ -137,7 +137,7 @@ func (m *RepoSearchView) HandleEvent(event interface{}) string {
 			}
 			m.lastStrokeTime = time.Now()
 		case key.Esc:
-			Channel <- tui.Terminate
+			return tui.Terminate
 		default:
 			m.input = m.input[:m.position] + string(typed) + m.input[m.position:]
 			m.position += utf8.RuneLen(typed)
@@ -154,7 +154,7 @@ func (m *RepoSearchView) HandleEvent(event interface{}) string {
 		Channel <- FooterMessage{Payload: ""}
 		m.IsSearching = false
 	}
-	return ""
+	return nil
 }
 
 func (m *RepoSearchView) SubViews() []tui.View {
@@ -305,7 +305,7 @@ func (m *CodeSearchView) Body(_ bool, size tui.Size) []tui.Text {
 	return slice
 }
 
-func (m *CodeSearchView) HandleEvent(event interface{}) string {
+func (m *CodeSearchView) HandleEvent(event interface{}) interface{} {
 	switch typed := event.(type) {
 	case CodeSearchResult:
 		if typed.CreatedAt.UnixMicro() > m.Result.CreatedAt.UnixMicro() {
@@ -345,7 +345,7 @@ func (m *CodeSearchView) HandleEvent(event interface{}) string {
 			}
 			m.lastStrokeTime = time.Now()
 		case key.Esc:
-			Channel <- tui.Terminate
+			return tui.Terminate
 		default:
 			m.input = m.input[:m.position] + string(typed) + m.input[m.position:]
 			m.position += utf8.RuneLen(typed)
@@ -362,7 +362,7 @@ func (m *CodeSearchView) HandleEvent(event interface{}) string {
 		Channel <- FooterMessage{Payload: ""}
 		m.IsSearching = false
 	}
-	return ""
+	return nil
 }
 
 func (m *CodeSearchView) SubViews() []tui.View {
@@ -474,23 +474,23 @@ func (m *CodeSubView) Options() tui.ViewOptions {
 	}
 }
 
-type FooterModel struct {
+type Footer struct {
 	message        string
 	MessageChannel chan string
 }
 
-func (*FooterModel) Style() tui.CellStyle {
+func (*Footer) Style() tui.CellStyle {
 	return tui.CellStyle{B256: 135}
 }
 
-func (f *FooterModel) Text() []tui.Text {
+func (f *Footer) Text() []tui.Text {
 	return []tui.Text{{Str: f.message, Style: f.Style()}}
 }
 
-func (f *FooterModel) HandleEvent(event interface{}) string {
+func (f *Footer) HandleEvent(event interface{}) interface{} {
 	switch typed := event.(type) {
 	case FooterMessage:
 		f.message = typed.Payload
 	}
-	return ""
+	return nil
 }

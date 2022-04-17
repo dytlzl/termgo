@@ -69,9 +69,13 @@ func Run(views map[string]View, options Options, channel chan interface{}) error
 			if ch == key.CtrlC {
 				return nil
 			}
-			newFocus := views[focusedViewName].HandleEvent(ch)
-			if newFocus != "" {
-				focusedViewName = newFocus
+			switch value := views[focusedViewName].HandleEvent(ch).(type) {
+			case string:
+				if value != "" {
+					focusedViewName = value
+				}
+			case terminate:
+				return nil
 			}
 		}
 		event := func() interface{} {
@@ -83,14 +87,22 @@ func Run(views map[string]View, options Options, channel chan interface{}) error
 				return nil
 			}
 		}()
-		newFocus := views[focusedViewName].HandleEvent(event)
-		if newFocus != "" {
-			focusedViewName = newFocus
+		switch value := views[focusedViewName].HandleEvent(event).(type) {
+		case string:
+			if value != "" {
+				focusedViewName = value
+			}
+		case terminate:
+			return nil
 		}
 		if options.Footer != nil {
-			newFocus := options.Footer.HandleEvent(event)
-			if newFocus != "" {
-				focusedViewName = newFocus
+			switch value := options.Footer.HandleEvent(event).(type) {
+			case string:
+				if value != "" {
+					focusedViewName = value
+				}
+			case terminate:
+				return nil
 			}
 		}
 

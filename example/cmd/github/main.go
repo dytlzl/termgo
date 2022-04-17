@@ -38,7 +38,7 @@ func Run(ctx context.Context) error {
 	}, tui.Options{
 		DefaultViewName: "repo",
 		Style:           tui.CellStyle{F256: 255, B256: 0},
-		Footer:          &github.FooterModel{},
+		Footer:          &github.Footer{},
 	}, github.Channel)
 	if err != nil {
 		return fmt.Errorf("an error has occured while running tui: %w", err)

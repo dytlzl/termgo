@@ -9,7 +9,7 @@ type DograMagraView struct {
 	tui.DefaultView
 }
 
-func (*DograMagraView) HandleEvent(event interface{}) string {
+func (*DograMagraView) HandleEvent(event interface{}) interface{} {
 	switch typed := event.(type) {
 	case rune:
 		switch typed {
@@ -17,7 +17,7 @@ func (*DograMagraView) HandleEvent(event interface{}) string {
 			return (*MenuView).Options(nil).Title
 		}
 	}
-	return ""
+	return nil
 }
 
 func (*DograMagraView) Body(bool, tui.Size) []tui.Text {
