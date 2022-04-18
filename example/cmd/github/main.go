@@ -43,6 +43,9 @@ func Run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("an error has occured while running tui: %w", err)
 	}
-	github.Finalize()
+	close(github.Finalizers)
+	for finalize := range github.Finalizers {
+		finalize()
+	}
 	return nil
 }

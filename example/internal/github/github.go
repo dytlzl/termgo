@@ -14,7 +14,7 @@ import (
 	"github.com/dytlzl/tervi/pkg/tui"
 )
 
-var Finalize = func() {}
+var Finalizers = make(chan func(), 16)
 
 var Servers = []github.GithubClient{}
 
@@ -186,7 +186,7 @@ func FetchReadMe(ctx context.Context, repo RepositoryWithOrigin, out chan interf
 }
 
 func terminateWithError(out chan interface{}, err error) {
-	Finalize = func() {
+	Finalizers <- func() {
 		fmt.Println(err)
 	}
 	out <- tui.Terminate
