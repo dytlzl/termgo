@@ -7,5 +7,11 @@ import (
 )
 
 func main() {
+	github.SetAPIs([]github.API{
+		{
+			Origin:  "github.com",
+			Address: "https://api.github.com",
+		},
+	})
 	github.Run(context.Background())
 }

@@ -35,15 +35,6 @@ func SetAPIs(apis []API) {
 	}
 }
 
-func init() {
-	SetAPIs([]API{
-		{
-			Origin:  "github.com",
-			Address: "https://api.github.com",
-		},
-	})
-}
-
 var Channel = make(chan interface{}, 100)
 
 type SearchInput struct {
