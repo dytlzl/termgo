@@ -15,7 +15,7 @@ import (
 
 var Finalizers = make(chan func(), 16)
 
-var clients = []GithubClient{}
+var Clients = []GithubClient{}
 
 var clientMap = map[string]GithubClient{}
 
@@ -30,7 +30,7 @@ func SetAPIs(apis []API) {
 		if err != nil {
 			panic(err)
 		}
-		clients = append(clients, client)
+		Clients = append(Clients, client)
 		clientMap[value.Origin] = client
 	}
 }
@@ -131,7 +131,7 @@ func OpenUrl(url string) error {
 
 func SearchCode(ctx context.Context, input SearchInput, out chan interface{}) {
 	items := make([]SearchResultItem, 0, 10)
-	for _, client := range clients {
+	for _, client := range Clients {
 		result, err := client.Search(ctx, input.Query, 1, 10)
 		if err != nil {
 			terminateWithError(out, err)
@@ -161,7 +161,7 @@ func FetchContent(ctx context.Context, item SearchResultItem, out chan interface
 func SearchRepositories(ctx context.Context, input SearchInput, out chan interface{}) {
 	repositories := make([]RepositoryWithOrigin, 0, 20)
 
-	for _, client := range clients {
+	for _, client := range Clients {
 		res, err := client.SearchRepositories(ctx, input.Query, 1, 10)
 		if err != nil {
 			terminateWithError(out, err)
