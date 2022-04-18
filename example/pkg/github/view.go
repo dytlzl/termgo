@@ -7,7 +7,6 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/dytlzl/tervi/example/pkg/github"
 	"github.com/dytlzl/tervi/pkg/key"
 	"github.com/dytlzl/tervi/pkg/tui"
 )
@@ -218,7 +217,7 @@ func (m *RepoSubView) Options() tui.ViewOptions {
 type CodeSearchView struct {
 	Result            CodeSearchResult
 	SearchInputCh     chan SearchInput
-	ContentInputCh    chan github.SearchResultItem
+	ContentInputCh    chan SearchResultItem
 	IsSearching       bool
 	ContentMap        map[string]string
 	ContentRequestMap map[string]bool
@@ -234,7 +233,7 @@ func InitCodeSearchView() *CodeSearchView {
 	return &CodeSearchView{
 		Result:            CodeSearchResult{},
 		SearchInputCh:     make(chan SearchInput, channelSize),
-		ContentInputCh:    make(chan github.SearchResultItem, channelSize),
+		ContentInputCh:    make(chan SearchResultItem, channelSize),
 		ContentMap:        map[string]string{},
 		ContentRequestMap: map[string]bool{},
 	}
@@ -390,7 +389,7 @@ type CodeSubView struct {
 	tui.DefaultView
 	content  string
 	query    string
-	item     github.SearchResultItem
+	item     SearchResultItem
 	runeMode bool
 }
 

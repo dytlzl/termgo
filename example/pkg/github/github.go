@@ -2,249 +2,197 @@ package github
 
 import (
 	"context"
-	"encoding/base64"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
+	"os"
 	"os/exec"
 	"os/user"
-	"strconv"
+	"path/filepath"
 	"strings"
+	"time"
+
+	"github.com/dytlzl/tervi/pkg/tui"
 )
 
-type GithubClient struct {
-	Origin     string
-	apiAddress string
-	token      string
-	cli        http.Client
+var Finalizers = make(chan func(), 16)
+
+var clients = []GithubClient{}
+
+var clientMap = map[string]GithubClient{}
+
+type API struct {
+	Origin  string
+	Address string
 }
 
-func NewClient(origin, apiAddress string) (GithubClient, error) {
-	token, err := exec.Command("security", "find-internet-password", "-w", "-s", origin).Output()
-	if err != nil {
-		return GithubClient{}, fmt.Errorf("could not obtain password of %s from key chain", origin)
-	}
-	tokenString := strings.TrimRight(string(token), "\n")
-	return GithubClient{
-		Origin:     origin,
-		apiAddress: apiAddress,
-		token:      tokenString,
-		cli:        http.Client{},
-	}, nil
-}
-
-func (g GithubClient) Request(ctx context.Context, method string, url string, paramMap map[string]interface{}) ([]byte, error) {
-	req, err := http.NewRequestWithContext(ctx, method, url, nil)
-	if err != nil {
-		return nil, err
-	}
-	params := req.URL.Query()
-	for k, v := range paramMap {
-		switch typed := v.(type) {
-		case string:
-			params.Add(k, typed)
-		case int:
-			params.Add(k, strconv.Itoa(typed))
+func SetAPIs(apis []API) {
+	for _, value := range apis {
+		client, err := NewClient(value.Origin, value.Address)
+		if err != nil {
+			panic(err)
 		}
+		clients = append(clients, client)
+		clientMap[value.Origin] = client
 	}
-	req.URL.RawQuery = params.Encode()
-	req.Header.Add("Accept", "application/vnd.github.v3+json")
-	u, err := user.Current()
-	if err != nil {
-		return nil, err
-	}
-	req.SetBasicAuth(u.Username, g.token)
-	resp, err := g.cli.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	if resp.StatusCode == http.StatusForbidden {
-		return nil, fmt.Errorf("status code is 403 forbidden, response body: %s", body)
-	}
-	return body, nil
 }
 
-func (g GithubClient) RequestWithEndpoint(ctx context.Context, method string, endpoint string, paramMap map[string]interface{}) ([]byte, error) {
-	return g.Request(ctx, method, g.apiAddress+endpoint, paramMap)
+func init() {
+	SetAPIs([]API{
+		{
+			Origin:  "github.com",
+			Address: "https://api.github.com",
+		},
+	})
 }
 
-type SearchResult struct {
-	TotalCount int                `json:"total_count"`
-	Items      []SearchResultItem `json:"items"`
+var Channel = make(chan interface{}, 100)
+
+type SearchInput struct {
+	Query     string
+	CreatedAt time.Time
 }
 
 type RepositorySearchResult struct {
-	TotalCount int          `json:"total_count"`
-	Items      []Repository `json:"items"`
+	SearchInput
+	Repositories []RepositoryWithOrigin
 }
 
-type IssueSearchResult struct {
-	TotalCount int     `json:"total_count"`
-	Items      []Issue `json:"items"`
+type CodeSearchResult struct {
+	SearchInput
+	Items []SearchResultItem
 }
 
-type User struct {
-	Login string `json:"login"`
+type ContentResult struct {
+	Url     string
+	Content string
 }
 
-type Issue struct {
-	Title     string `json:"title"`
-	HtmlUrl   string `json:"html_url"`
-	EventsUrl string `json:"events_url"`
-	User      User   `json:"user"`
+type ReadMeResult struct {
+	HtmlUrl string
+	ReadMe  string
 }
 
-type Event struct {
-	Event             string `json:"event"`
-	RequestedReviewer User   `json:"requested_reviewer"`
+type RepositoryWithOrigin struct {
+	Repository
+	Origin string
 }
 
-type SearchResultItem struct {
-	Url        string     `json:"url"`
-	Path       string     `json:"path"`
-	HtmlUrl    string     `json:"html_url"`
-	Repository Repository `json:"repository"`
+type FooterMessage struct {
+	Payload string
 }
 
-func (i SearchResultItem) Origin() string {
-	return strings.Split(i.Url, "/")[2]
-}
-
-func (g *GithubClient) FetchSearchResultContents(ctx context.Context, item SearchResultItem) (string, error) {
-	res, err := g.Request(ctx, "GET", item.Url, nil)
+func RepositoryPath(url string) string {
+	segments := strings.Split(url, "/")
+	u, err := user.Current()
 	if err != nil {
-		return "", err
+		panic(err)
 	}
-	var jsonMap struct {
-		Content string `json:"content"`
-	}
-	if err := json.Unmarshal(res, &jsonMap); err != nil {
-		return "", err
-	}
-	bytes, err := base64.StdEncoding.DecodeString(strings.ReplaceAll(jsonMap.Content, "\n", ""))
-	if err != nil {
-		return "", err
-	}
-	return string(bytes), nil
+	rootPath := u.HomeDir + "/" + "ghq"
+	return rootPath + strings.Join(segments[1:], "/")
 }
 
-func (g *GithubClient) FetchReadMe(ctx context.Context, fullName string) (string, error) {
-	res, err := g.RequestWithEndpoint(ctx, "GET", "/repos/"+fullName+"/readme", nil)
+func CloneRepository(dirPath, url string) error {
+	err := os.MkdirAll(dirPath, os.ModePerm)
 	if err != nil {
-		return "", err
+		return fmt.Errorf("failed to create directory where repository is cloned: %w", err)
 	}
-	var jsonMap struct {
-		Content string `json:"content"`
-	}
-	if err := json.Unmarshal(res, &jsonMap); err != nil {
-		return "", err
-	}
-	bytes, err := base64.StdEncoding.DecodeString(strings.ReplaceAll(jsonMap.Content, "\n", ""))
+	prevDir, _ := os.Getwd()
+	os.Chdir(dirPath)
+	defer os.Chdir(prevDir)
+	_, err = exec.Command("git", "clone", url).Output()
 	if err != nil {
-		return "", err
+		return fmt.Errorf("failed to execute git clone %s: %w", url, err)
 	}
-	return string(bytes), nil
+	return nil
 }
 
-func (g *GithubClient) Search(ctx context.Context, query string, page int, per_page int) (SearchResult, error) {
-	res, err := g.RequestWithEndpoint(ctx, "GET", "/search/code", map[string]interface{}{
-		"q":        query,
-		"per_page": per_page,
-		"page":     page,
-	})
-	if err != nil {
-		return SearchResult{}, err
-	}
-	var jsonMap SearchResult
-	if err := json.Unmarshal(res, &jsonMap); err != nil {
-		return SearchResult{}, fmt.Errorf("failed to unmarshal json: %w: %s", err, string(res))
-	}
-	return jsonMap, nil
-}
-
-func (g *GithubClient) SearchRepositories(ctx context.Context, query string, page int, per_page int) (RepositorySearchResult, error) {
-	res, err := g.RequestWithEndpoint(ctx, "GET", "/search/repositories", map[string]interface{}{
-		"q":        query,
-		"per_page": per_page,
-		"page":     page,
-	})
-	if err != nil {
-		return RepositorySearchResult{}, err
-	}
-	var jsonMap RepositorySearchResult
-	if err := json.Unmarshal(res, &jsonMap); err != nil {
-		return RepositorySearchResult{}, fmt.Errorf("failed to unmarshal json: %w: %s", err, string(res))
-	}
-	return jsonMap, nil
-}
-
-func (g *GithubClient) SearchIssues(ctx context.Context, query string, page int, per_page int) (IssueSearchResult, error) {
-	res, err := g.RequestWithEndpoint(ctx, "GET", "/search/issues", map[string]interface{}{
-		"q":        query,
-		"per_page": per_page,
-		"page":     page,
-	})
-	if err != nil {
-		return IssueSearchResult{}, err
-	}
-	var jsonMap IssueSearchResult
-	if err := json.Unmarshal(res, &jsonMap); err != nil {
-		return IssueSearchResult{}, fmt.Errorf("failed to unmarshal json: %w: %s", err, string(res))
-	}
-	return jsonMap, nil
-}
-
-func (g *GithubClient) FetchEventsFromIssue(ctx context.Context, issue Issue) ([]Event, error) {
-	res, err := g.Request(ctx, "GET", issue.EventsUrl, nil)
-	if err != nil {
-		return nil, err
-	}
-	var jsonMap []Event
-	if err := json.Unmarshal(res, &jsonMap); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal json: %w: %s", err, string(res))
-	}
-	return jsonMap, nil
-}
-
-type Repository struct {
-	FullName    string `json:"full_name"`
-	HtmlUrl     string `json:"html_url"`
-	Description string `json:"description"`
-}
-
-const REPOSITORY_NUMBER_PER_PAGE = 100
-
-func (g *GithubClient) fetchRepostories(ctx context.Context, org string, page int) ([]Repository, error) {
-	res, err := g.RequestWithEndpoint(ctx, "GET", "/orgs/"+org+"/repos", map[string]interface{}{
-		"per_page": REPOSITORY_NUMBER_PER_PAGE,
-		"page":     page,
-	})
-	if err != nil {
-		return nil, err
-	}
-	var jsonMap []Repository
-	if err := json.Unmarshal(res, &jsonMap); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal json: %w: %s", err, string(res))
-	}
-	return jsonMap, nil
-}
-
-func (g *GithubClient) FetchAllRepostories(ctx context.Context, org string) ([]Repository, error) {
-	repositories := make([]Repository, 0, 512)
-	for i := 1; ; i++ {
-		pageRepositories, err := g.fetchRepostories(ctx, org, i)
+func OpenRepository(url string) error {
+	repoPath := RepositoryPath(url)
+	if _, err := os.Stat(repoPath); os.IsNotExist(err) {
+		Channel <- FooterMessage{"Cloning " + url + "..."}
+		dirPath := filepath.Dir(repoPath)
+		err = CloneRepository(dirPath, url)
 		if err != nil {
-			return nil, err
+			return fmt.Errorf("failed to clone %s: %w", url, err)
 		}
-		repositories = append(repositories, pageRepositories...)
-		if len(pageRepositories) != REPOSITORY_NUMBER_PER_PAGE {
-			return repositories, err
+		Channel <- FooterMessage{"Cloning " + url + "..." + " Done."}
+	} else {
+		Channel <- FooterMessage{url + " already exists locally."}
+	}
+	err := exec.Command("open", "-a", "Visual Studio Code", repoPath).Start()
+	if err != nil {
+		return fmt.Errorf("failed to open Visual Studio Code: %w", err)
+	}
+	return nil
+}
+
+func OpenUrl(url string) error {
+	return exec.Command("open", url).Start()
+}
+
+func SearchCode(ctx context.Context, input SearchInput, out chan interface{}) {
+	items := make([]SearchResultItem, 0, 10)
+	for _, client := range clients {
+		result, err := client.Search(ctx, input.Query, 1, 10)
+		if err != nil {
+			terminateWithError(out, err)
+			return
+		}
+		items = append(items, result.Items...)
+	}
+	out <- CodeSearchResult{
+		SearchInput: input,
+		Items:       items,
+	}
+}
+
+func FetchContent(ctx context.Context, item SearchResultItem, out chan interface{}) {
+	client := clientMap[item.Origin()]
+	result, err := client.FetchSearchResultContents(ctx, item)
+	if err != nil {
+		terminateWithError(out, err)
+		return
+	}
+	out <- ContentResult{
+		Url:     item.Url,
+		Content: result,
+	}
+}
+
+func SearchRepositories(ctx context.Context, input SearchInput, out chan interface{}) {
+	repositories := make([]RepositoryWithOrigin, 0, 20)
+
+	for _, client := range clients {
+		res, err := client.SearchRepositories(ctx, input.Query, 1, 10)
+		if err != nil {
+			terminateWithError(out, err)
+			return
+		}
+		for _, v := range res.Items {
+			repositories = append(repositories, RepositoryWithOrigin{v, client.Origin})
 		}
 	}
+	out <- RepositorySearchResult{
+		SearchInput:  input,
+		Repositories: repositories,
+	}
+}
+
+func FetchReadMe(ctx context.Context, repo RepositoryWithOrigin, out chan interface{}) {
+	client := clientMap[repo.Origin]
+	result, err := client.FetchReadMe(ctx, repo.FullName)
+	if err != nil {
+		terminateWithError(out, err)
+		return
+	}
+	out <- ReadMeResult{
+		HtmlUrl: repo.HtmlUrl,
+		ReadMe:  result,
+	}
+}
+
+func terminateWithError(out chan interface{}, err error) {
+	Finalizers <- func() {
+		fmt.Println(err)
+	}
+	out <- tui.Terminate
 }
