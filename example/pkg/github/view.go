@@ -157,6 +157,12 @@ func (m *RepoSearchView) HandleEvent(event interface{}) interface{} {
 }
 
 func (m *RepoSearchView) SubViews() []tui.View {
+	if m.selectedRepository >= len(m.Result.Repositories) {
+		m.selectedRepository = len(m.Result.Repositories) - 1
+	}
+	if m.selectedRepository < 0 {
+		m.selectedRepository = 0
+	}
 	if m.selectedRepository < len(m.Result.Repositories) {
 		repo := m.Result.Repositories[m.selectedRepository]
 		if !m.ReadMeRequestMap[repo.HtmlUrl] {
@@ -365,6 +371,12 @@ func (m *CodeSearchView) HandleEvent(event interface{}) interface{} {
 }
 
 func (m *CodeSearchView) SubViews() []tui.View {
+	if m.selectedItem >= len(m.Result.Items) {
+		m.selectedItem = len(m.Result.Items) - 1
+	}
+	if m.selectedItem < 0 {
+		m.selectedItem = 0
+	}
 	if m.selectedItem < len(m.Result.Items) {
 		item := m.Result.Items[m.selectedItem]
 		if !m.ContentRequestMap[item.Url] {
