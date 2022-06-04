@@ -16,13 +16,13 @@ func Run(ctx context.Context) error {
 		for {
 			select {
 			case query := <-repoView.SearchInputCh:
-				go SearchRepositories(ctx, query, Channel)
+				go SendToChan(SearchRepositories(ctx, query))
 			case query := <-repoView.ReadMeInputCh:
-				go FetchReadMe(ctx, query, Channel)
+				go SendToChan(FetchReadMe(ctx, query))
 			case query := <-codeView.SearchInputCh:
-				go SearchCode(ctx, query, Channel)
+				go SendToChan(SearchCode(ctx, query))
 			case item := <-codeView.ContentInputCh:
-				go FetchContent(ctx, item, Channel)
+				go SendToChan(FetchContent(ctx, item))
 			}
 		}
 	}()

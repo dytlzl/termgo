@@ -1,5 +1,5 @@
 # tervi
-[![ci](https://github.com/dytlzl/tervi/workflows/ci/badge.svg)](https://github.com/dytlzl/tervi/actions/workflows/ci.yaml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/dytlzl/tervi.svg)](https://pkg.go.dev/github.com/dytlzl/tervi) [![ci](https://github.com/dytlzl/tervi/workflows/ci/badge.svg)](https://github.com/dytlzl/tervi/actions/workflows/ci.yaml)
 
 Terminal View for Go
 

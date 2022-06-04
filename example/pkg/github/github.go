@@ -120,70 +120,69 @@ func OpenUrl(url string) error {
 	return exec.Command("open", url).Start()
 }
 
-func SearchCode(ctx context.Context, input SearchInput, out chan interface{}) {
+func SendToChan(data interface{}, err error) {
+	if err != nil {
+		Finalizers <- func() {
+			fmt.Fprintln(os.Stderr, err)
+		}
+		Channel <- tui.Terminate
+		return
+	}
+	Channel <- data
+}
+
+func SearchCode(ctx context.Context, input SearchInput) (CodeSearchResult, error) {
 	items := make([]SearchResultItem, 0, 10)
 	for _, client := range Clients {
 		result, err := client.Search(ctx, input.Query, 1, 10)
 		if err != nil {
-			terminateWithError(out, err)
-			return
+			return CodeSearchResult{}, err
 		}
 		items = append(items, result.Items...)
 	}
-	out <- CodeSearchResult{
+	return CodeSearchResult{
 		SearchInput: input,
 		Items:       items,
-	}
+	}, nil
 }
 
-func FetchContent(ctx context.Context, item SearchResultItem, out chan interface{}) {
+func FetchContent(ctx context.Context, item SearchResultItem) (ContentResult, error) {
 	client := clientMap[item.Origin()]
 	result, err := client.FetchSearchResultContents(ctx, item)
 	if err != nil {
-		terminateWithError(out, err)
-		return
+		return ContentResult{}, err
 	}
-	out <- ContentResult{
+	return ContentResult{
 		Url:     item.Url,
 		Content: result,
-	}
+	}, nil
 }
 
-func SearchRepositories(ctx context.Context, input SearchInput, out chan interface{}) {
+func SearchRepositories(ctx context.Context, input SearchInput) (RepositorySearchResult, error) {
 	repositories := make([]RepositoryWithOrigin, 0, 20)
-
 	for _, client := range Clients {
 		res, err := client.SearchRepositories(ctx, input.Query, 1, 10)
 		if err != nil {
-			terminateWithError(out, err)
-			return
+			return RepositorySearchResult{}, nil
 		}
 		for _, v := range res.Items {
 			repositories = append(repositories, RepositoryWithOrigin{v, client.Origin})
 		}
 	}
-	out <- RepositorySearchResult{
+	return RepositorySearchResult{
 		SearchInput:  input,
 		Repositories: repositories,
-	}
+	}, nil
 }
 
-func FetchReadMe(ctx context.Context, repo RepositoryWithOrigin, out chan interface{}) {
+func FetchReadMe(ctx context.Context, repo RepositoryWithOrigin) (ReadMeResult, error) {
 	client := clientMap[repo.Origin]
 	result, err := client.FetchReadMe(ctx, repo.FullName)
 	if err != nil {
-		terminateWithError(out, err)
-		return
+		return ReadMeResult{}, nil
 	}
-	out <- ReadMeResult{
+	return ReadMeResult{
 		HtmlUrl: repo.HtmlUrl,
 		ReadMe:  result,
-	}
-}
-
-func terminateWithError(out chan interface{}, err error) {
-	Finalizers <- func() {
-		fmt.Println(err)
-	}
-	out <- tui.Terminate
+	}, nil
 }
