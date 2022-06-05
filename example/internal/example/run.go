@@ -60,33 +60,25 @@ func Run() {
 					tui.ViewWithRenderer(n.Body).RelativeSize(5, 12).Title("Note").Style(hasFocus(n)).Border(hasFocus(n)),
 				).RelativeSize(12, 6),
 				tui.HStack(
-					tui.ViewWithRenderer(cc.Body).RelativeSize(5, 12).Title("Color Code").Style(hasFocus(cc)).Border(hasFocus(cc)),
+					tui.ViewWithRenderer(cc.Body).AbsoluteSize(69, 0).Title("Color Code").Style(hasFocus(cc)).Border(hasFocus(cc)),
+					tui.ViewWithRenderer(kc.Body).Title("Key Code").Style(hasFocus(kc)).Border(hasFocus(kc)),
 					tui.VStack(
 						tui.HStack(
 							tui.VStack(
 								tui.HStack(
-									tui.VStack().RelativeSize(6, 12).Border(style),
-									tui.VStack().RelativeSize(6, 12).Border(style),
-								).RelativeSize(12, 6),
-								tui.HStack().RelativeSize(12, 6).Border(style),
-							).RelativeSize(6, 12),
-							tui.VStack().RelativeSize(6, 12).Border(style),
-						).RelativeSize(12, 6),
-						tui.HStack().RelativeSize(12, 6).Border(style),
-					).RelativeSize(3, 12).Border(style),
-					tui.ViewWithRenderer(kc.Body).RelativeSize(4, 12).Title("Key Code").Style(hasFocus(kc)).Border(hasFocus(kc)),
-				).RelativeSize(12, 6).Border(style),
-			).Title("Example").Padding(2, 2, 1, 3),
-			tui.ReversedVStack(
+									tui.VStack().Border(style),
+									tui.VStack().Border(style),
+								),
+								tui.HStack().Border(style),
+							),
+							tui.VStack().Border(style),
+						),
+						tui.HStack().Border(style),
+					).Border(style).Title("Layout"),
+				).Border(style),
 				tui.TextView("Footer is here.").Style(style.Invert()).AbsoluteSize(0, 1).Padding(0, 1, 0, 0),
-			),
-			func() *tui.View {
-				if focus == q {
-					return tui.ViewWithRenderer(q.Body).RelativeSize(4, 2).Title("Quit").Style(style.Invert()).Border(style.Invert())
-				} else {
-					return nil
-				}
-			}(),
+			).Title("Example"),
+			tui.ViewWithRenderer(q.Body).AbsoluteSize(36, 7).Title("Quit").Style(style.Invert()).Border(style.Invert()).Hidden(focus != q),
 		)
 	},
 		tui.OptionEventHandler(handleEvent),

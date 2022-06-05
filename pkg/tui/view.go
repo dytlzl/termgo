@@ -2,10 +2,6 @@ package tui
 
 type View struct {
 	title           string
-	x               int
-	y               int
-	reverseH        bool
-	reverseV        bool
 	relativeWidth   int
 	relativeHeight  int
 	absoluteWidth   int
@@ -14,6 +10,7 @@ type View struct {
 	paddingLeading  int
 	paddingBottom   int
 	paddingTrailing int
+	dir             direction
 	style           *Style
 	border          *Style
 	children        []*View
@@ -21,8 +18,15 @@ type View struct {
 	eventHandler    func(event any) any
 }
 
+type direction int
+
+const (
+	horizontal = iota + 1
+	vertical
+)
+
 func ViewWithRenderer(renderer func(Size) []Text) *View {
-	return &View{renderer: renderer, relativeWidth: 12, relativeHeight: 12}
+	return &View{renderer: renderer}
 }
 
 func (v *View) RelativeSize(width, height int) *View {
@@ -42,12 +46,6 @@ func (v *View) Padding(top, leading, bottom, trailing int) *View {
 	v.paddingLeading = leading
 	v.paddingBottom = bottom
 	v.paddingTrailing = trailing
-	return v
-}
-
-func (v *View) Position(x, y int) *View {
-	v.x = x
-	v.y = y
 	return v
 }
 
@@ -71,63 +69,32 @@ func (v *View) Border(style Style) *View {
 	return v
 }
 
+func (v *View) Hidden(isHidden bool) *View {
+	if isHidden {
+		return nil
+	} else {
+		return v
+	}
+}
+
 func TextView(body string) *View {
 	v := &View{}
 	v.renderer = func(s Size) []Text { return []Text{{Str: body, Style: *v.style}} }
 	return v
 }
 
+func Spacer(views ...*View) *View {
+	return &View{}
+}
+
 func HStack(views ...*View) *View {
-	x := 0
-	for i, v := range views {
-		if views[i] == nil {
-			continue
-		}
-		views[i].x = x
-		x += v.relativeWidth
-	}
-	return &View{children: views}
+	return &View{children: views, dir: horizontal}
 }
 
 func VStack(views ...*View) *View {
-	y := 0
-	for i, v := range views {
-		if views[i] == nil {
-			continue
-		}
-		views[i].y = y
-		y += v.relativeHeight
-	}
-	return &View{children: views}
-}
-
-func ReversedHStack(views ...*View) *View {
-	v := HStack(views...)
-	v.reverseH = true
-	return v
-}
-
-func ReversedVStack(views ...*View) *View {
-	v := VStack(views...)
-	v.reverseV = true
-	return v
+	return &View{children: views, dir: vertical}
 }
 
 func ZStack(views ...*View) *View {
-	for i := range views {
-		if views[i] == nil {
-			continue
-		}
-		if views[i].relativeWidth == 0 {
-			views[i].relativeWidth = 12
-		}
-		if views[i].relativeHeight == 0 {
-			views[i].relativeHeight = 12
-		}
-		if views[i].x == 0 && views[i].y == 0 {
-			views[i].x = (12 - views[i].relativeWidth) / 2
-			views[i].y = (12 - views[i].relativeHeight) / 2
-		}
-	}
 	return &View{children: views}
 }

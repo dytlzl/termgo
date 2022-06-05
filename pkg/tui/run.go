@@ -160,45 +160,66 @@ func renderView(r *Renderer, v *View, cfg config, frame rect) error {
 	availableWidth := frame.width - v.paddingLeading - v.paddingTrailing
 	availableHeight := frame.height - v.paddingTop - v.paddingBottom
 
-	x := frame.x + v.paddingLeading
-	y := frame.y + v.paddingTop
-	if v.reverseH {
-		x += availableWidth
-	}
-	if v.reverseV {
-		y += availableHeight
+	accumulatedX := frame.x + v.paddingLeading
+	accumulatedY := frame.y + v.paddingTop
+
+	remainedWidth := availableWidth
+	remainedHeight := availableHeight
+	numberOfAutoWidth := 0
+	numberOfAutoHeight := 0
+
+	for idx := range v.children {
+		if v.children[idx] == nil {
+			continue
+		}
+		if v.children[idx].absoluteWidth == 0 {
+			v.children[idx].absoluteWidth = availableWidth * v.children[idx].relativeWidth / 12
+		}
+		if v.children[idx].absoluteHeight == 0 {
+			v.children[idx].absoluteHeight = availableHeight * v.children[idx].relativeHeight / 12
+		}
+
+		remainedWidth -= v.children[idx].absoluteWidth
+		remainedHeight -= v.children[idx].absoluteHeight
+
+		if v.children[idx].absoluteWidth == 0 {
+			numberOfAutoWidth++
+		}
+
+		if v.children[idx].absoluteHeight == 0 {
+			numberOfAutoHeight++
+		}
 	}
 	for _, child := range v.children {
 		if child == nil {
-			return nil
+			continue
 		}
 		if child.absoluteWidth == 0 {
-			if child.relativeWidth == 0 {
-				child.relativeWidth = 12
-			}
-			child.absoluteWidth = availableWidth * child.relativeWidth / 12
-			if child.x+child.relativeWidth == 12 {
-				child.absoluteWidth = availableWidth - availableWidth*child.x/12
+			if v.dir == horizontal {
+				child.absoluteWidth = remainedWidth / numberOfAutoWidth
+				numberOfAutoWidth--
+				remainedWidth -= child.absoluteWidth
+			} else {
+				child.absoluteWidth = availableWidth
 			}
 		}
-
 		if child.absoluteHeight == 0 {
-			if child.relativeHeight == 0 {
-				child.relativeHeight = 12
-			}
-			child.absoluteHeight = availableHeight * child.relativeHeight / 12
-			if child.y+child.relativeHeight == 12 {
-				child.absoluteHeight = availableHeight - availableHeight*child.y/12
+			if v.dir == vertical {
+				child.absoluteHeight = remainedHeight / numberOfAutoHeight
+				numberOfAutoHeight--
+				remainedHeight -= child.absoluteHeight
+			} else {
+				child.absoluteHeight = availableHeight
 			}
 		}
 
-		x := frame.x + v.paddingLeading + availableWidth*child.x/12
-		if v.reverseH {
-			x = frame.x + v.paddingLeading + availableWidth - availableWidth*child.x/12 - child.absoluteWidth
+		x := frame.x + v.paddingLeading + (availableWidth-child.absoluteWidth)/2
+		if v.dir == horizontal {
+			x = accumulatedX
 		}
-		y := frame.y + v.paddingTop + availableHeight*child.y/12
-		if v.reverseV {
-			y = frame.y + v.paddingTop + availableHeight - availableHeight*child.y/12 - child.absoluteHeight
+		y := frame.y + v.paddingTop + (availableHeight-child.absoluteHeight)/2
+		if v.dir == vertical {
+			y = accumulatedY
 		}
 
 		err = renderView(r, child, cfg, rect{
@@ -209,6 +230,12 @@ func renderView(r *Renderer, v *View, cfg config, frame rect) error {
 		})
 		if err != nil {
 			return err
+		}
+		if v.dir == horizontal {
+			accumulatedX += child.absoluteWidth
+		}
+		if v.dir == vertical {
+			accumulatedY += child.absoluteHeight
 		}
 	}
 	return nil
