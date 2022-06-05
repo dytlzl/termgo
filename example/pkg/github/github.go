@@ -35,7 +35,7 @@ func SetAPIs(apis []API) {
 	}
 }
 
-var Channel = make(chan interface{}, 100)
+var Channel = make(chan any, 100)
 
 type SearchInput struct {
 	Query     string
@@ -81,17 +81,15 @@ func RepositoryPath(url string) string {
 	return rootPath + strings.Join(segments[1:], "/")
 }
 
-func CloneRepository(dirPath, url string) error {
+func CloneRepository(repoPath, url string) error {
+	dirPath := filepath.Dir(repoPath)
 	err := os.MkdirAll(dirPath, os.ModePerm)
 	if err != nil {
 		return fmt.Errorf("failed to create directory where repository is cloned: %w", err)
 	}
-	prevDir, _ := os.Getwd()
-	os.Chdir(dirPath)
-	defer os.Chdir(prevDir)
-	_, err = exec.Command("git", "clone", url).Output()
+	_, err = exec.Command("git", "clone", url, repoPath).Output()
 	if err != nil {
-		return fmt.Errorf("failed to execute git clone %s: %w", url, err)
+		return fmt.Errorf("failed to clone %s: %w", url, err)
 	}
 	return nil
 }
@@ -100,8 +98,7 @@ func OpenRepository(url string) error {
 	repoPath := RepositoryPath(url)
 	if _, err := os.Stat(repoPath); os.IsNotExist(err) {
 		Channel <- FooterMessage{"Cloning " + url + "..."}
-		dirPath := filepath.Dir(repoPath)
-		err = CloneRepository(dirPath, url)
+		err = CloneRepository(repoPath, url)
 		if err != nil {
 			return fmt.Errorf("failed to clone %s: %w", url, err)
 		}
@@ -120,7 +117,7 @@ func OpenUrl(url string) error {
 	return exec.Command("open", url).Start()
 }
 
-func SendToChan(data interface{}, err error) {
+func SendToChan(data any, err error) {
 	if err != nil {
 		Finalizers <- func() {
 			fmt.Fprintln(os.Stderr, err)

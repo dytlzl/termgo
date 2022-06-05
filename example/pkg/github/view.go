@@ -27,7 +27,7 @@ type RepoSearchView struct {
 	ReadMeRequestMap   map[string]bool
 }
 
-func InitRepoSearchView() *RepoSearchView {
+func NewRepoSearchView() *RepoSearchView {
 	return &RepoSearchView{
 		Result:           RepositorySearchResult{},
 		SearchInputCh:    make(chan SearchInput, channelSize),
@@ -37,19 +37,12 @@ func InitRepoSearchView() *RepoSearchView {
 	}
 }
 
-func (m *RepoSearchView) Title() string {
-	if m.Result.Query != "" {
-		return fmt.Sprintf("Search Result of '%s' - Repository Search", m.Result.Query)
-	}
-	return "Repository Search"
-}
-
-func (m *RepoSearchView) Body(bool, tui.Size) []tui.Text {
-	style := tui.CellStyle{F256: 255, B256: 0}
-	cursorStyle := tui.CellStyle{F256: 93, B256: style.F256, HasCursor: true}
+func (m *RepoSearchView) Body(tui.Size) []tui.Text {
+	style := tui.Style{F256: 255, B256: 0}
+	cursorStyle := tui.Style{F256: 93, B256: style.F256, HasCursor: true}
 
 	slice := make([]tui.Text, 0, len(m.Result.Repositories)+10)
-	slice = append(slice, tui.Text{Str: "Query > ", Style: tui.CellStyle{F256: 135, B256: style.B256}})
+	slice = append(slice, tui.Text{Str: "Query > ", Style: tui.Style{F256: 135, B256: style.B256}})
 	if m.position == len(m.input) {
 		slice = append(slice, []tui.Text{
 			{Str: m.input[:m.position], Style: style},
@@ -74,15 +67,15 @@ func (m *RepoSearchView) Body(bool, tui.Size) []tui.Text {
 		lastOrigin := ""
 		for i, repo := range m.Result.Repositories {
 			if repo.Origin != lastOrigin {
-				slice = append(slice, tui.Text{Str: " " + repo.Origin + ":\n", Style: tui.CellStyle{F256: 8, B256: style.B256}})
+				slice = append(slice, tui.Text{Str: " " + repo.Origin + ":\n", Style: tui.Style{F256: 8, B256: style.B256}})
 				lastOrigin = repo.Origin
 			}
 			if i == m.selectedRepository {
-				slice = append(slice, tui.Text{Str: "> ", Style: tui.CellStyle{F256: 8, B256: style.B256}})
-				slice = append(slice, tui.Text{Str: fmt.Sprintf(" #%d", i), Style: tui.CellStyle{F256: 8, B256: 163}})
-				slice = append(slice, tui.Text{Str: fmt.Sprintf(" %s \n", repo.FullName), Style: tui.CellStyle{F256: 255, B256: 163}})
+				slice = append(slice, tui.Text{Str: "> ", Style: tui.Style{F256: 8, B256: style.B256}})
+				slice = append(slice, tui.Text{Str: fmt.Sprintf(" #%d", i), Style: tui.Style{F256: 8, B256: 163}})
+				slice = append(slice, tui.Text{Str: fmt.Sprintf(" %s \n", repo.FullName), Style: tui.Style{F256: 255, B256: 163}})
 			} else {
-				slice = append(slice, tui.Text{Str: fmt.Sprintf("   #%d", i), Style: tui.CellStyle{F256: 8, B256: style.B256}})
+				slice = append(slice, tui.Text{Str: fmt.Sprintf("   #%d", i), Style: tui.Style{F256: 8, B256: style.B256}})
 				slice = append(slice, tui.Text{Str: fmt.Sprintf(" %s \n", repo.FullName), Style: style})
 			}
 		}
@@ -90,7 +83,7 @@ func (m *RepoSearchView) Body(bool, tui.Size) []tui.Text {
 	return slice
 }
 
-func (m *RepoSearchView) HandleEvent(event interface{}) interface{} {
+func (m *RepoSearchView) HandleEvent(event any) any {
 	switch typed := event.(type) {
 	case RepositorySearchResult:
 		if typed.CreatedAt.UnixMicro() > m.Result.CreatedAt.UnixMicro() {
@@ -156,7 +149,7 @@ func (m *RepoSearchView) HandleEvent(event interface{}) interface{} {
 	return nil
 }
 
-func (m *RepoSearchView) SubViews() []tui.View {
+func (m *RepoSearchView) SubView() *RepoSubView {
 	if m.selectedRepository >= len(m.Result.Repositories) {
 		m.selectedRepository = len(m.Result.Repositories) - 1
 	}
@@ -172,33 +165,19 @@ func (m *RepoSearchView) SubViews() []tui.View {
 		if repo.Description == "" && m.ReadMeMap[repo.HtmlUrl] == "" {
 			return nil
 		}
-		return []tui.View{
-			&RepoSubView{repo: repo, readMe: m.ReadMeMap[repo.HtmlUrl]},
-		}
+		return &RepoSubView{repo: repo, readMe: m.ReadMeMap[repo.HtmlUrl]}
 	}
 	return nil
 }
 
-func (m *RepoSearchView) Options() tui.ViewOptions {
-	return tui.ViewOptions{
-		Title:    m.Title(),
-		SubViews: m.SubViews(),
-	}
-}
-
 type RepoSubView struct {
-	tui.DefaultView
 	repo   RepositoryWithOrigin
 	readMe string
 }
 
-func (m *RepoSubView) Title() string {
-	return m.repo.FullName
-}
-
-func (m *RepoSubView) Body(bool, tui.Size) []tui.Text {
-	style := tui.CellStyle{F256: 255, B256: 0}
-	keyStyle := tui.CellStyle{F256: 135, B256: style.B256}
+func (m *RepoSubView) Body(tui.Size) []tui.Text {
+	style := tui.Style{F256: 255, B256: 0}
+	keyStyle := tui.Style{F256: 135, B256: style.B256}
 	slice := make([]tui.Text, 0, 5)
 
 	if m.repo.Description != "" {
@@ -211,13 +190,6 @@ func (m *RepoSubView) Body(bool, tui.Size) []tui.Text {
 		slice = append(slice, tui.Text{Str: m.readMe + "\n", Style: style})
 	}
 	return slice
-}
-
-func (m *RepoSubView) Options() tui.ViewOptions {
-	return tui.ViewOptions{
-		Title: m.Title(),
-		Width: tui.NewFraction(2, 3),
-	}
 }
 
 type CodeSearchView struct {
@@ -235,7 +207,7 @@ type CodeSearchView struct {
 	runeMode          bool
 }
 
-func InitCodeSearchView() *CodeSearchView {
+func NewCodeSearchView() *CodeSearchView {
 	return &CodeSearchView{
 		Result:            CodeSearchResult{},
 		SearchInputCh:     make(chan SearchInput, channelSize),
@@ -245,19 +217,12 @@ func InitCodeSearchView() *CodeSearchView {
 	}
 }
 
-func (m *CodeSearchView) Title() string {
-	if m.Result.Query != "" {
-		return fmt.Sprintf("Search Result of '%s' - Code Search", m.Result.Query)
-	}
-	return "Code Search"
-}
-
-func (m *CodeSearchView) Body(_ bool, size tui.Size) []tui.Text {
-	style := tui.CellStyle{F256: 255, B256: 0}
-	cursorStyle := tui.CellStyle{F256: 93, B256: style.F256, HasCursor: true}
+func (m *CodeSearchView) Body(size tui.Size) []tui.Text {
+	style := tui.Style{F256: 255, B256: 0}
+	cursorStyle := tui.Style{F256: 93, B256: style.F256, HasCursor: true}
 
 	slice := make([]tui.Text, 0, len(m.Result.Items)+10)
-	slice = append(slice, tui.Text{Str: "Query > ", Style: tui.CellStyle{F256: 135, B256: style.B256}})
+	slice = append(slice, tui.Text{Str: "Query > ", Style: tui.Style{F256: 135, B256: style.B256}})
 	if m.position == len(m.input) {
 		slice = append(slice, []tui.Text{
 			{Str: m.input[:m.position], Style: style},
@@ -282,7 +247,7 @@ func (m *CodeSearchView) Body(_ bool, size tui.Size) []tui.Text {
 		lastOrigin := ""
 		for i, item := range m.Result.Items {
 			if item.Origin() != lastOrigin {
-				slice = append(slice, tui.Text{Str: " " + item.Origin() + ":\n", Style: tui.CellStyle{F256: 8, B256: style.B256}})
+				slice = append(slice, tui.Text{Str: " " + item.Origin() + ":\n", Style: tui.Style{F256: 8, B256: style.B256}})
 				lastOrigin = item.Origin()
 			}
 			path := item.Path
@@ -296,13 +261,13 @@ func (m *CodeSearchView) Body(_ bool, size tui.Size) []tui.Text {
 				path += "..."
 			}
 			if i == m.selectedItem {
-				slice = append(slice, tui.Text{Str: "> ", Style: tui.CellStyle{F256: 8, B256: style.B256}})
-				slice = append(slice, tui.Text{Str: fmt.Sprintf(" #%d ", i), Style: tui.CellStyle{F256: 8, B256: 163}})
-				slice = append(slice, tui.Text{Str: item.Repository.FullName, Style: tui.CellStyle{F256: 225, B256: 163}})
-				slice = append(slice, tui.Text{Str: fmt.Sprintf(" %s \n", path), Style: tui.CellStyle{F256: 255, B256: 163}})
+				slice = append(slice, tui.Text{Str: "> ", Style: tui.Style{F256: 8, B256: style.B256}})
+				slice = append(slice, tui.Text{Str: fmt.Sprintf(" #%d ", i), Style: tui.Style{F256: 8, B256: 163}})
+				slice = append(slice, tui.Text{Str: item.Repository.FullName, Style: tui.Style{F256: 225, B256: 163}})
+				slice = append(slice, tui.Text{Str: fmt.Sprintf(" %s \n", path), Style: tui.Style{F256: 255, B256: 163}})
 			} else {
-				slice = append(slice, tui.Text{Str: fmt.Sprintf("   #%d ", i), Style: tui.CellStyle{F256: 8, B256: style.B256}})
-				slice = append(slice, tui.Text{Str: item.Repository.FullName, Style: tui.CellStyle{F256: 225, B256: style.B256}})
+				slice = append(slice, tui.Text{Str: fmt.Sprintf("   #%d ", i), Style: tui.Style{F256: 8, B256: style.B256}})
+				slice = append(slice, tui.Text{Str: item.Repository.FullName, Style: tui.Style{F256: 225, B256: style.B256}})
 				slice = append(slice, tui.Text{Str: fmt.Sprintf(" %s \n", path), Style: style})
 			}
 		}
@@ -310,7 +275,7 @@ func (m *CodeSearchView) Body(_ bool, size tui.Size) []tui.Text {
 	return slice
 }
 
-func (m *CodeSearchView) HandleEvent(event interface{}) interface{} {
+func (m *CodeSearchView) HandleEvent(event any) any {
 	switch typed := event.(type) {
 	case CodeSearchResult:
 		if typed.CreatedAt.UnixMicro() > m.Result.CreatedAt.UnixMicro() {
@@ -370,7 +335,7 @@ func (m *CodeSearchView) HandleEvent(event interface{}) interface{} {
 	return nil
 }
 
-func (m *CodeSearchView) SubViews() []tui.View {
+func (m *CodeSearchView) SubView() *CodeSubView {
 	if m.selectedItem >= len(m.Result.Items) {
 		m.selectedItem = len(m.Result.Items) - 1
 	}
@@ -383,38 +348,24 @@ func (m *CodeSearchView) SubViews() []tui.View {
 			m.ContentInputCh <- item
 			m.ContentRequestMap[item.Url] = true
 		}
-		return []tui.View{
-			&CodeSubView{item: item, content: m.ContentMap[item.Url], query: m.Result.Query, runeMode: m.runeMode},
-		}
+		return &CodeSubView{item: item, content: m.ContentMap[item.Url], query: m.Result.Query, runeMode: m.runeMode}
 	}
 	return nil
 }
 
-func (m *CodeSearchView) Options() tui.ViewOptions {
-	return tui.ViewOptions{
-		Title:    m.Title(),
-		SubViews: m.SubViews(),
-	}
-}
-
 type CodeSubView struct {
-	tui.DefaultView
 	content  string
 	query    string
 	item     SearchResultItem
 	runeMode bool
 }
 
-func (m *CodeSubView) Title() string {
-	return m.item.Path
-}
-
-func (m *CodeSubView) Body(_ bool, size tui.Size) []tui.Text {
+func (m *CodeSubView) Body(size tui.Size) []tui.Text {
 	if m.runeMode {
 		return m.Body_RuneMode(false)
 	}
 	if m.content == "" {
-		return []tui.Text{{Str: "Loading...", Style: tui.CellStyle{F256: 135, B256: 0}}}
+		return []tui.Text{{Str: "Loading...", Style: tui.Style{F256: 135, B256: 0}}}
 	}
 	content := strings.ReplaceAll(m.content, string(rune(9)), "    ")
 	lines := strings.Split(content, "\n")
@@ -447,13 +398,13 @@ func (m *CodeSubView) Body(_ bool, size tui.Size) []tui.Text {
 	slice := make([]tui.Text, 0, 64)
 	lineNumberWidth := len(strconv.Itoa(endRow + 1))
 	for i := beginRow; i <= endRow; i++ {
-		slice = append(slice, tui.Text{Str: fmt.Sprintf(fmt.Sprintf("%%%dd ", lineNumberWidth), i+1), Style: tui.CellStyle{F256: 135, B256: 0}})
+		slice = append(slice, tui.Text{Str: fmt.Sprintf(fmt.Sprintf("%%%dd ", lineNumberWidth), i+1), Style: tui.Style{F256: 135, B256: 0}})
 		index := strings.Index(lines[i], m.query)
 		if index == -1 {
 			slice = append(slice, tui.Text{Str: lines[i] + "\n", Style: tui.DefaultStyle})
 		} else {
 			slice = append(slice, tui.Text{Str: lines[i][:index], Style: tui.DefaultStyle})
-			slice = append(slice, tui.Text{Str: lines[i][index : index+len(m.query)], Style: tui.CellStyle{B256: 163}})
+			slice = append(slice, tui.Text{Str: lines[i][index : index+len(m.query)], Style: tui.Style{B256: 163}})
 			slice = append(slice, tui.Text{Str: lines[i][index+len(m.query):] + "\n", Style: tui.DefaultStyle})
 		}
 	}
@@ -462,27 +413,20 @@ func (m *CodeSubView) Body(_ bool, size tui.Size) []tui.Text {
 
 func (m *CodeSubView) Body_RuneMode(bool) []tui.Text {
 	if m.content == "" {
-		return []tui.Text{{Str: "Loading...", Style: tui.CellStyle{F256: 135, B256: 0}}}
+		return []tui.Text{{Str: "Loading...", Style: tui.Style{F256: 135, B256: 0}}}
 	}
 	slice := make([]tui.Text, 0, 2048)
 	lineNumber := 0
-	slice = append(slice, tui.Text{Str: fmt.Sprintf("%3d ", lineNumber), Style: tui.CellStyle{F256: 135, B256: 0}})
+	slice = append(slice, tui.Text{Str: fmt.Sprintf("%3d ", lineNumber), Style: tui.Style{F256: 135, B256: 0}})
 	for _, r := range m.content {
 		slice = append(slice, tui.Text{Str: " " + strconv.Itoa(int(r)), Style: tui.DefaultStyle})
 		if r == '\n' {
 			lineNumber++
 			slice = append(slice, tui.Text{Str: "\n", Style: tui.DefaultStyle})
-			slice = append(slice, tui.Text{Str: fmt.Sprintf("%3d ", lineNumber), Style: tui.CellStyle{F256: 135, B256: 0}})
+			slice = append(slice, tui.Text{Str: fmt.Sprintf("%3d ", lineNumber), Style: tui.Style{F256: 135, B256: 0}})
 		}
 	}
 	return slice
-}
-
-func (m *CodeSubView) Options() tui.ViewOptions {
-	return tui.ViewOptions{
-		Title: m.Title(),
-		Width: tui.NewFraction(2, 3),
-	}
 }
 
 type Footer struct {
@@ -490,15 +434,15 @@ type Footer struct {
 	MessageChannel chan string
 }
 
-func (*Footer) Style() tui.CellStyle {
-	return tui.CellStyle{B256: 135}
+func (*Footer) Style() tui.Style {
+	return tui.Style{B256: 135}
 }
 
 func (f *Footer) Text() []tui.Text {
 	return []tui.Text{{Str: f.message, Style: f.Style()}}
 }
 
-func (f *Footer) HandleEvent(event interface{}) interface{} {
+func (f *Footer) HandleEvent(event any) any {
 	switch typed := event.(type) {
 	case FooterMessage:
 		f.message = typed.Payload

@@ -10,10 +10,10 @@ import (
 type Renderer struct {
 	width               int
 	height              int
-	rows                [][]Cell
+	rows                [][]cell
 	cursorX             int
 	cursorY             int
-	eventChan           chan interface{}
+	eventChan           chan any
 	ttyin               *os.File
 	oldState            *term.State
 	shouldSkipRendering bool
@@ -28,7 +28,7 @@ func NewRenderer() (*Renderer, error) {
 	initRenderer()
 	return &Renderer{
 		ttyin:     ttyin,
-		eventChan: make(chan interface{}, 64),
+		eventChan: make(chan any, 64),
 		oldState:  state,
 	}, nil
 }

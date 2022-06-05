@@ -6,18 +6,18 @@ import (
 	"golang.org/x/term"
 )
 
-type Cell struct {
+type cell struct {
 	Char  rune
 	Width int
-	Style CellStyle
+	Style Style
 }
 
 type Text struct {
 	Str   string
-	Style CellStyle
+	Style Style
 }
 
-type CellStyle struct {
+type Style struct {
 	Foreground int
 	Background int
 	F256       int
@@ -25,13 +25,13 @@ type CellStyle struct {
 	HasCursor  bool
 }
 
-type Options struct {
-	DefaultViewName string
-	Style           CellStyle
-	Footer          FooterView
-}
+var DefaultStyle = Style{}
 
-var DefaultStyle = CellStyle{}
+func (s Style) Invert() Style {
+	s.Background, s.Foreground = s.Foreground, s.Background
+	s.B256, s.F256 = s.F256, s.B256
+	return s
+}
 
 func (r *Renderer) UpdateTerminalSize() (bool, error) {
 	width, height, err := term.GetSize(r.fd())
@@ -42,29 +42,29 @@ func (r *Renderer) UpdateTerminalSize() (bool, error) {
 	if hasChanged {
 		r.width = width
 		r.height = height
-		r.rows = make([][]Cell, r.height)
+		r.rows = make([][]cell, r.height)
 		for y := 0; y < r.height; y++ {
-			r.rows[y] = make([]Cell, r.width)
+			r.rows[y] = make([]cell, r.width)
 		}
 	}
 	return hasChanged, nil
 }
 
-func (r *Renderer) Fill(style CellStyle) {
+func (r *Renderer) fill(style Style) {
 	for y := 0; y < r.height; y++ {
 		for x := 0; x < r.width; x++ {
-			r.rows[y][x] = Cell{' ', 1, style}
+			r.rows[y][x] = cell{' ', 1, style}
 		}
 	}
 }
 
-func (r *Renderer) put(cell Cell, x, y int) {
-	if r.rows[y][x] != cell {
-		r.rows[y][x] = cell
+func (r *Renderer) put(c cell, x, y int) {
+	if r.rows[y][x] != c {
+		r.rows[y][x] = c
 	}
 }
 
-func (r *Renderer) Draw() {
+func (r *Renderer) draw() {
 	origin()
 	lastStyle := DefaultStyle
 	for y := 0; y < r.height; y++ {

@@ -34,7 +34,7 @@ func NewClient(origin, apiAddress string) (GithubClient, error) {
 	}, nil
 }
 
-func (g GithubClient) Request(ctx context.Context, method string, url string, paramMap map[string]interface{}) ([]byte, error) {
+func (g GithubClient) Request(ctx context.Context, method string, url string, paramMap map[string]any) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, method, url, nil)
 	if err != nil {
 		return nil, err
@@ -70,7 +70,7 @@ func (g GithubClient) Request(ctx context.Context, method string, url string, pa
 	return body, nil
 }
 
-func (g GithubClient) RequestWithEndpoint(ctx context.Context, method string, endpoint string, paramMap map[string]interface{}) ([]byte, error) {
+func (g GithubClient) RequestWithEndpoint(ctx context.Context, method string, endpoint string, paramMap map[string]any) ([]byte, error) {
 	return g.Request(ctx, method, g.apiAddress+endpoint, paramMap)
 }
 
@@ -153,7 +153,7 @@ func (g *GithubClient) FetchReadMe(ctx context.Context, fullName string) (string
 }
 
 func (g *GithubClient) Search(ctx context.Context, query string, page int, per_page int) (SearchResult, error) {
-	res, err := g.RequestWithEndpoint(ctx, "GET", "/search/code", map[string]interface{}{
+	res, err := g.RequestWithEndpoint(ctx, "GET", "/search/code", map[string]any{
 		"q":        query,
 		"per_page": per_page,
 		"page":     page,
@@ -169,7 +169,7 @@ func (g *GithubClient) Search(ctx context.Context, query string, page int, per_p
 }
 
 func (g *GithubClient) SearchRepositories(ctx context.Context, query string, page int, per_page int) (RepositoryItemsSearchResult, error) {
-	res, err := g.RequestWithEndpoint(ctx, "GET", "/search/repositories", map[string]interface{}{
+	res, err := g.RequestWithEndpoint(ctx, "GET", "/search/repositories", map[string]any{
 		"q":        query,
 		"per_page": per_page,
 		"page":     page,
@@ -185,7 +185,7 @@ func (g *GithubClient) SearchRepositories(ctx context.Context, query string, pag
 }
 
 func (g *GithubClient) SearchIssues(ctx context.Context, query string, page int, per_page int) (IssueSearchResult, error) {
-	res, err := g.RequestWithEndpoint(ctx, "GET", "/search/issues", map[string]interface{}{
+	res, err := g.RequestWithEndpoint(ctx, "GET", "/search/issues", map[string]any{
 		"q":        query,
 		"per_page": per_page,
 		"page":     page,
@@ -221,7 +221,7 @@ type Repository struct {
 const REPOSITORY_NUMBER_PER_PAGE = 100
 
 func (g *GithubClient) fetchRepostories(ctx context.Context, org string, page int) ([]Repository, error) {
-	res, err := g.RequestWithEndpoint(ctx, "GET", "/orgs/"+org+"/repos", map[string]interface{}{
+	res, err := g.RequestWithEndpoint(ctx, "GET", "/orgs/"+org+"/repos", map[string]any{
 		"per_page": REPOSITORY_NUMBER_PER_PAGE,
 		"page":     page,
 	})
