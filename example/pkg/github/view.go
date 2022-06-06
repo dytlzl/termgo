@@ -15,8 +15,6 @@ const channelSize = 64
 
 type RepoSearchView struct {
 	Result             RepositorySearchResult
-	SearchInputCh      chan SearchInput
-	ReadMeInputCh      chan RepositoryWithOrigin
 	IsSearching        bool
 	selectedRepository int
 	input              string
@@ -30,8 +28,6 @@ type RepoSearchView struct {
 func NewRepoSearchView() *RepoSearchView {
 	return &RepoSearchView{
 		Result:           RepositorySearchResult{},
-		SearchInputCh:    make(chan SearchInput, channelSize),
-		ReadMeInputCh:    make(chan RepositoryWithOrigin, channelSize),
 		ReadMeMap:        map[string]string{},
 		ReadMeRequestMap: map[string]bool{},
 	}
@@ -137,13 +133,13 @@ func (m *RepoSearchView) HandleEvent(event any) any {
 		}
 	}
 	if m.input != m.lastInput && m.lastStrokeTime.UnixMilli()+10 < time.Now().UnixMilli() {
-		m.SearchInputCh <- SearchInput{Query: m.input, CreatedAt: time.Now()}
+		requestChannel <- RepositorySearchInput{Query: m.input, CreatedAt: time.Now()}
 		m.lastInput = m.input
-		Channel <- FooterMessage{Payload: "Searching..."}
+		channel <- FooterMessage{Payload: "Searching..."}
 		m.IsSearching = true
 	}
 	if m.IsSearching && m.lastInput == m.Result.Query {
-		Channel <- FooterMessage{Payload: ""}
+		channel <- FooterMessage{Payload: ""}
 		m.IsSearching = false
 	}
 	return nil
@@ -159,7 +155,7 @@ func (m *RepoSearchView) SubView() *RepoSubView {
 	if m.selectedRepository < len(m.Result.Repositories) {
 		repo := m.Result.Repositories[m.selectedRepository]
 		if !m.ReadMeRequestMap[repo.HtmlUrl] {
-			m.ReadMeInputCh <- repo
+			requestChannel <- repo
 			m.ReadMeRequestMap[repo.HtmlUrl] = true
 		}
 		if repo.Description == "" && m.ReadMeMap[repo.HtmlUrl] == "" {
@@ -194,8 +190,6 @@ func (m *RepoSubView) Body(tui.Size) []tui.Text {
 
 type CodeSearchView struct {
 	Result            CodeSearchResult
-	SearchInputCh     chan SearchInput
-	ContentInputCh    chan SearchResultItem
 	IsSearching       bool
 	ContentMap        map[string]string
 	ContentRequestMap map[string]bool
@@ -209,9 +203,6 @@ type CodeSearchView struct {
 
 func NewCodeSearchView() *CodeSearchView {
 	return &CodeSearchView{
-		Result:            CodeSearchResult{},
-		SearchInputCh:     make(chan SearchInput, channelSize),
-		ContentInputCh:    make(chan SearchResultItem, channelSize),
 		ContentMap:        map[string]string{},
 		ContentRequestMap: map[string]bool{},
 	}
@@ -323,13 +314,13 @@ func (m *CodeSearchView) HandleEvent(event any) any {
 		}
 	}
 	if m.input != m.lastInput && m.lastStrokeTime.UnixMilli()+50 < time.Now().UnixMilli() {
-		m.SearchInputCh <- SearchInput{Query: m.input, CreatedAt: time.Now()}
+		requestChannel <- CodeSearchInput{Query: m.input, CreatedAt: time.Now()}
 		m.lastInput = m.input
-		Channel <- FooterMessage{Payload: "Searching..."}
+		channel <- FooterMessage{Payload: "Searching..."}
 		m.IsSearching = true
 	}
 	if m.IsSearching && m.lastInput == m.Result.Query {
-		Channel <- FooterMessage{Payload: ""}
+		channel <- FooterMessage{Payload: ""}
 		m.IsSearching = false
 	}
 	return nil
@@ -345,7 +336,7 @@ func (m *CodeSearchView) SubView() *CodeSubView {
 	if m.selectedItem < len(m.Result.Items) {
 		item := m.Result.Items[m.selectedItem]
 		if !m.ContentRequestMap[item.Url] {
-			m.ContentInputCh <- item
+			requestChannel <- item
 			m.ContentRequestMap[item.Url] = true
 		}
 		return &CodeSubView{item: item, content: m.ContentMap[item.Url], query: m.Result.Query, runeMode: m.runeMode}
@@ -427,25 +418,4 @@ func (m *CodeSubView) Body_RuneMode(bool) []tui.Text {
 		}
 	}
 	return slice
-}
-
-type Footer struct {
-	message        string
-	MessageChannel chan string
-}
-
-func (*Footer) Style() tui.Style {
-	return tui.Style{B256: 135}
-}
-
-func (f *Footer) Text() []tui.Text {
-	return []tui.Text{{Str: f.message, Style: f.Style()}}
-}
-
-func (f *Footer) HandleEvent(event any) any {
-	switch typed := event.(type) {
-	case FooterMessage:
-		f.message = typed.Payload
-	}
-	return nil
 }

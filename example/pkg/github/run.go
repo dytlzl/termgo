@@ -13,17 +13,23 @@ func Run(ctx context.Context) error {
 
 	// Search Loop
 	go func() {
-		for {
-			select {
-			case query := <-repoView.SearchInputCh:
-				go SendToChan(SearchRepositories(ctx, query))
-			case query := <-repoView.ReadMeInputCh:
-				go SendToChan(FetchReadMe(ctx, query))
-			case query := <-codeView.SearchInputCh:
-				go SendToChan(SearchCode(ctx, query))
-			case item := <-codeView.ContentInputCh:
-				go SendToChan(FetchContent(ctx, item))
-			}
+		for item := range requestChannel {
+			item := item
+			go func() {
+				SendToChan(func() (any, error) {
+					switch typed := item.(type) {
+					case RepositorySearchInput:
+						return SearchRepositories(ctx, typed)
+					case RepositoryWithOrigin:
+						return FetchReadMe(ctx, typed)
+					case CodeSearchInput:
+						return SearchCode(ctx, typed)
+					case SearchResultItem:
+						return FetchContent(ctx, typed)
+					}
+					return nil, nil
+				}())
+			}()
 		}
 	}()
 
@@ -61,7 +67,7 @@ func Run(ctx context.Context) error {
 			if mode == "repo" {
 				title = "Repository Search"
 				if repoView.Result.Query != "" {
-					title = fmt.Sprintf("Result of '%s' - Repository Search", repoView.Result.Query)
+					title = fmt.Sprintf("Result of '%s' - %s", repoView.Result.Query, title)
 				}
 				body = repoView.Body
 				subView := repoView.SubView()
@@ -74,7 +80,7 @@ func Run(ctx context.Context) error {
 				subView := codeView.SubView()
 				title = "Code Search"
 				if codeView.Result.Query != "" {
-					title = fmt.Sprintf("Result of '%s' - Code Search", codeView.Result.Query)
+					title = fmt.Sprintf("Result of '%s' - %s", codeView.Result.Query, title)
 				}
 				if subView != nil {
 					subViewTitle = subView.item.Path
@@ -94,7 +100,7 @@ func Run(ctx context.Context) error {
 		},
 		tui.OptionEventHandler(handleEvent),
 		tui.OptionStyle(tui.Style{F256: 255, B256: 0}),
-		tui.OptionChannel(Channel),
+		tui.OptionChannel(channel),
 	)
 	if err != nil {
 		return fmt.Errorf("an error has occured while running tui: %w", err)
@@ -105,3 +111,7 @@ func Run(ctx context.Context) error {
 	}
 	return nil
 }
+
+var channel = make(chan any, 100)
+
+var requestChannel = make(chan any, 100)
