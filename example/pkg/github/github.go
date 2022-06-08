@@ -35,20 +35,23 @@ func SetAPIs(apis []API) {
 	}
 }
 
-var Channel = make(chan any, 100)
+type CodeSearchInput struct {
+	Query     string
+	CreatedAt time.Time
+}
 
-type SearchInput struct {
+type RepositorySearchInput struct {
 	Query     string
 	CreatedAt time.Time
 }
 
 type RepositorySearchResult struct {
-	SearchInput
+	RepositorySearchInput
 	Repositories []RepositoryWithOrigin
 }
 
 type CodeSearchResult struct {
-	SearchInput
+	CodeSearchInput
 	Items []SearchResultItem
 }
 
@@ -97,14 +100,14 @@ func CloneRepository(repoPath, url string) error {
 func OpenRepository(url string) error {
 	repoPath := RepositoryPath(url)
 	if _, err := os.Stat(repoPath); os.IsNotExist(err) {
-		Channel <- FooterMessage{"Cloning " + url + "..."}
+		channel <- FooterMessage{"Cloning " + url + "..."}
 		err = CloneRepository(repoPath, url)
 		if err != nil {
 			return fmt.Errorf("failed to clone %s: %w", url, err)
 		}
-		Channel <- FooterMessage{"Cloning " + url + "..." + " Done."}
+		channel <- FooterMessage{"Cloning " + url + "..." + " Done."}
 	} else {
-		Channel <- FooterMessage{url + " already exists locally."}
+		channel <- FooterMessage{url + " already exists locally."}
 	}
 	err := exec.Command("open", "-a", "Visual Studio Code", repoPath).Start()
 	if err != nil {
@@ -122,13 +125,13 @@ func SendToChan(data any, err error) {
 		Finalizers <- func() {
 			fmt.Fprintln(os.Stderr, err)
 		}
-		Channel <- tui.Terminate
+		channel <- tui.Terminate
 		return
 	}
-	Channel <- data
+	channel <- data
 }
 
-func SearchCode(ctx context.Context, input SearchInput) (CodeSearchResult, error) {
+func SearchCode(ctx context.Context, input CodeSearchInput) (CodeSearchResult, error) {
 	items := make([]SearchResultItem, 0, 10)
 	for _, client := range Clients {
 		result, err := client.Search(ctx, input.Query, 1, 10)
@@ -138,8 +141,8 @@ func SearchCode(ctx context.Context, input SearchInput) (CodeSearchResult, error
 		items = append(items, result.Items...)
 	}
 	return CodeSearchResult{
-		SearchInput: input,
-		Items:       items,
+		CodeSearchInput: input,
+		Items:           items,
 	}, nil
 }
 
@@ -155,7 +158,7 @@ func FetchContent(ctx context.Context, item SearchResultItem) (ContentResult, er
 	}, nil
 }
 
-func SearchRepositories(ctx context.Context, input SearchInput) (RepositorySearchResult, error) {
+func SearchRepositories(ctx context.Context, input RepositorySearchInput) (RepositorySearchResult, error) {
 	repositories := make([]RepositoryWithOrigin, 0, 20)
 	for _, client := range Clients {
 		res, err := client.SearchRepositories(ctx, input.Query, 1, 10)
@@ -167,8 +170,8 @@ func SearchRepositories(ctx context.Context, input SearchInput) (RepositorySearc
 		}
 	}
 	return RepositorySearchResult{
-		SearchInput:  input,
-		Repositories: repositories,
+		RepositorySearchInput: input,
+		Repositories:          repositories,
 	}, nil
 }
 

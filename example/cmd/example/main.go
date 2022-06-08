@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/dytlzl/tervi/example/internal/example"
+	"github.com/dytlzl/tervi/example/pkg/example"
 )
 
 func main() {

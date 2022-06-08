@@ -6,7 +6,7 @@ import (
 	"github.com/mattn/go-runewidth"
 )
 
-type widget struct {
+type viewRenderer struct {
 	renderer        *Renderer
 	x               int
 	y               int
@@ -23,14 +23,14 @@ type Size struct {
 	Height int
 }
 
-func newWidget(renderer *Renderer, x, y, width, height, paddingTop, paddingLeading, paddingBottom, paddingTrailing int) (*widget, error) {
+func newViewRenderer(renderer *Renderer, x, y, width, height, paddingTop, paddingLeading, paddingBottom, paddingTrailing int) (*viewRenderer, error) {
 	if x+width > renderer.width || y+height > renderer.height {
 		return nil, errors.New("terminal size is too small")
 	}
-	return &widget{renderer, x, y, width, height, paddingTop, paddingLeading, paddingBottom, paddingTrailing}, nil
+	return &viewRenderer{renderer, x, y, width, height, paddingTop, paddingLeading, paddingBottom, paddingTrailing}, nil
 }
 
-func (w *widget) putBody(slice []Text) {
+func (w *viewRenderer) putBody(slice []Text) {
 	x, y := 0, 0
 	for _, as := range slice {
 		for _, r := range as.Str {
@@ -65,7 +65,7 @@ func (w *widget) putBody(slice []Text) {
 	}
 }
 
-func (w *widget) putBorder(style Style) {
+func (w *viewRenderer) putBorder(style Style) {
 	for x := 1; x < w.width-1; x++ {
 		c := cell{Char: '─', Width: 1, Style: style}
 		w.renderer.rows[w.y][w.x+x] = c
@@ -82,7 +82,7 @@ func (w *widget) putBorder(style Style) {
 	w.renderer.rows[w.y+w.height-1][w.x+w.width-1] = cell{Char: '╯', Width: 1, Style: style}
 }
 
-func (w *widget) putTitle(slice []Text) {
+func (w *viewRenderer) putTitle(slice []Text) {
 	x := 2 - w.paddingTop
 	for _, as := range slice {
 		for _, rune_ := range as.Str {
@@ -102,7 +102,7 @@ func (w *widget) putTitle(slice []Text) {
 	}
 }
 
-func (w *widget) fill(c cell) {
+func (w *viewRenderer) fill(c cell) {
 	for y := 0; y < w.height; y++ {
 		for x := 0; x < w.width; x++ {
 			if w.x+x > 0 && w.renderer.rows[w.y+y][w.x+x-1].Width == 2 {
@@ -114,7 +114,7 @@ func (w *widget) fill(c cell) {
 	}
 }
 
-func (w *widget) put(c cell, x, y int) {
+func (w *viewRenderer) put(c cell, x, y int) {
 	w.renderer.put(c, w.x+x+w.paddingLeading, w.y+y+w.paddingTop)
 }
 
