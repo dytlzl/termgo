@@ -89,10 +89,10 @@ func Run(ctx context.Context) error {
 			}
 			return tui.VStack(
 				tui.ZStack(
-					tui.ViewWithRenderer(body).Title(title).Border(tui.Style{F256: 255, B256: 0}),
+					tui.CreateView(body).Title(title).Border(tui.Style{F256: 255, B256: 0}),
 					tui.HStack(
 						tui.Spacer(),
-						tui.ViewWithRenderer(subViewBody).Title(subViewTitle).Border(tui.Style{F256: 255, B256: 0}).Hidden(subViewTitle == ""),
+						tui.CreateView(subViewBody).Title(subViewTitle).Border(tui.Style{F256: 255, B256: 0}).Hidden(subViewTitle == ""),
 					).Padding(2, 2, 2, 2),
 				),
 				tui.TextView(footerMessage).AbsoluteSize(0, 1).Style(tui.Style{F256: 15, B256: 135}).Padding(0, 1, 0, 1),

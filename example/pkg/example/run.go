@@ -57,11 +57,11 @@ func Run() {
 			tui.VStack(
 				tui.HStack(
 					tui.TextView(dograMagra).RelativeSize(7, 12).Title("Dogra Magra").Style(style).Border(style),
-					tui.ViewWithRenderer(n.Body).RelativeSize(5, 12).Title("Note").Style(hasFocus(n)).Border(hasFocus(n)),
+					tui.CreateView(n.Body).RelativeSize(5, 12).Title("Note").Style(hasFocus(n)).Border(hasFocus(n)),
 				).RelativeSize(12, 6),
 				tui.HStack(
-					tui.ViewWithRenderer(cc.Body).AbsoluteSize(69, 0).Title("Color Code").Style(hasFocus(cc)).Border(hasFocus(cc)),
-					tui.ViewWithRenderer(kc.Body).Title("Key Code").Style(hasFocus(kc)).Border(hasFocus(kc)),
+					tui.CreateView(cc.Body).AbsoluteSize(69, 0).Title("Color Code").Style(hasFocus(cc)).Border(hasFocus(cc)),
+					tui.CreateView(kc.Body).Title("Key Code").Style(hasFocus(kc)).Border(hasFocus(kc)),
 					tui.VStack(
 						tui.HStack(
 							tui.VStack(
@@ -78,7 +78,7 @@ func Run() {
 				).Border(style),
 				tui.TextView("Footer is here.").Style(style.Invert()).AbsoluteSize(0, 1).Padding(0, 1, 0, 0),
 			).Title("Example"),
-			tui.ViewWithRenderer(q.Body).AbsoluteSize(36, 7).Title("Quit").Style(style.Invert()).Border(style.Invert()).Hidden(focus != q),
+			tui.CreateView(q.Body).AbsoluteSize(36, 7).Title("Quit").Style(style.Invert()).Border(style.Invert()).Hidden(focus != q),
 		)
 	},
 		tui.OptionEventHandler(handleEvent),

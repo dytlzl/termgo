@@ -25,10 +25,6 @@ const (
 	vertical
 )
 
-func ViewWithRenderer(renderer func(Size) []Text) *View {
-	return &View{renderer: renderer}
-}
-
 func (v *View) RelativeSize(width, height int) *View {
 	v.relativeWidth = width
 	v.relativeHeight = height
@@ -51,7 +47,7 @@ func (v *View) Padding(top, leading, bottom, trailing int) *View {
 
 func (v *View) Title(title string) *View {
 	v.title = title
-	v.paddingTop = 1
+	v.paddingTop = 2
 	return v
 }
 
@@ -97,4 +93,8 @@ func VStack(views ...*View) *View {
 
 func ZStack(views ...*View) *View {
 	return &View{children: views}
+}
+
+func CreateView(renderer func(Size) []Text) *View {
+	return &View{renderer: renderer}
 }

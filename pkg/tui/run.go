@@ -11,7 +11,9 @@ import (
 
 func Run(createView func() *View, options ...option) error {
 
-	cfg := config{}
+	cfg := config{
+		style: &DefaultStyle,
+	}
 	for _, opt := range options {
 		err := opt(&cfg)
 		if err != nil {
@@ -67,7 +69,6 @@ func Run(createView func() *View, options ...option) error {
 		if len(keyBuffer) == 0 {
 			r.shouldSkipRendering = true
 		}
-		v := createView()
 		for {
 			ch, size := readBuffer(keyBuffer)
 			if size == 0 {
@@ -116,7 +117,7 @@ func Run(createView func() *View, options ...option) error {
 		// Clear
 		r.fill(*cfg.style)
 
-		v = createView()
+		v := createView()
 
 		// Render views
 		err = renderView(r, v, cfg, rect{0, 0, r.width, r.height})
@@ -137,9 +138,9 @@ var Terminate = terminate{}
 var bufferForDebug = make([]any, 0)
 
 func renderView(r *Renderer, v *View, cfg config, frame rect) error {
-	w, err := newWidget(r, frame.x, frame.y, frame.width, frame.height, v.paddingTop, v.paddingLeading, v.paddingBottom, v.paddingTrailing)
+	w, err := newViewRenderer(r, frame.x, frame.y, frame.width, frame.height, v.paddingTop, v.paddingLeading, v.paddingBottom, v.paddingTrailing)
 	if err != nil {
-		return fmt.Errorf("failed to create widget: %w", err)
+		return fmt.Errorf("failed to create viewRenderer: %w", err)
 	}
 	if v.style == nil {
 		v.style = cfg.style
