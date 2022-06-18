@@ -117,7 +117,7 @@ func Run(createView func() *View, options ...option) error {
 		// Clear
 		r.fill(*cfg.style)
 
-		v := createView()
+		v := ZStack(createView())
 
 		// Render views
 		err = renderView(r, v, cfg, rect{0, 0, r.width, r.height})
