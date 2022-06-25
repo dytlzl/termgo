@@ -28,6 +28,9 @@ const (
 	vertical
 )
 
+// RelativeSize specifies relative width and height of units that the view used.
+// The maximum number allowed is 12(100% of the parent view),
+// and 0 means auto-resizing.
 func (v *View) RelativeSize(width, height int) *View {
 	if v == nil {
 		return nil
@@ -37,6 +40,8 @@ func (v *View) RelativeSize(width, height int) *View {
 	return v
 }
 
+// AbsoluteSize specifies absolute width and height of units that the view used.
+// 0 means auto-resizing.
 func (v *View) AbsoluteSize(width, height int) *View {
 	if v == nil {
 		return nil
@@ -46,9 +51,25 @@ func (v *View) AbsoluteSize(width, height int) *View {
 	return v
 }
 
-func (v *View) Padding(top, leading, bottom, trailing int) *View {
+// Padding sets padding values to the view.
+// When one value is specified, it applies the same padding to all four sides.
+// When two values are specified, the first padding applies to the top and bottom, the second to the left and right.
+// When three values are specified, the first padding applies to the top, the second to the right and left, the third to the bottom.
+// When four values are specified, the paddings apply to the top, right, bottom, and left in that order (clockwise).
+func (v *View) Padding(values ...int) *View {
 	if v == nil {
 		return nil
+	}
+	top, leading, bottom, trailing := 0, 0, 0, 0
+	switch len(values) {
+	case 1:
+		top, leading, bottom, trailing = values[0], values[0], values[0], values[0]
+	case 2:
+		top, leading, bottom, trailing = values[0], values[1], values[0], values[1]
+	case 3:
+		top, leading, bottom, trailing = values[0], values[1], values[2], values[1]
+	case 4:
+		top, leading, bottom, trailing = values[0], values[1], values[2], values[3]
 	}
 	v.paddingTop = top
 	v.paddingLeading = leading
@@ -57,6 +78,7 @@ func (v *View) Padding(top, leading, bottom, trailing int) *View {
 	return v
 }
 
+// Title sets title to the view.
 func (v *View) Title(title string) *View {
 	if v == nil {
 		return nil
@@ -74,6 +96,7 @@ func (v *View) Style(style Style) *View {
 	return v
 }
 
+// FGColor sets a foreground color to the view.
 func (v *View) FGColor(color int) *View {
 	if v == nil {
 		return nil
@@ -85,6 +108,7 @@ func (v *View) FGColor(color int) *View {
 	return v
 }
 
+// BGColor sets a background color to the view.
 func (v *View) BGColor(color int) *View {
 	if v == nil {
 		return nil
