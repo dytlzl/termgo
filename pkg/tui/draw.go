@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"os"
 
 	"golang.org/x/term"
 )
@@ -12,7 +13,7 @@ type cell struct {
 	Style Style
 }
 
-type Text struct {
+type text struct {
 	Str   string
 	Style Style
 }
@@ -25,15 +26,11 @@ type Style struct {
 	HasCursor  bool
 }
 
-var DefaultStyle = Style{}
-
-func (s Style) Invert() Style {
-	s.Background, s.Foreground = s.Foreground, s.Background
-	s.B256, s.F256 = s.F256, s.B256
-	return s
+func TermSize() (int, int, error) {
+	return term.GetSize(int(os.Stdin.Fd()))
 }
 
-func (r *Renderer) UpdateTerminalSize() (bool, error) {
+func (r *renderer) updateTerminalSize() (bool, error) {
 	width, height, err := term.GetSize(r.fd())
 	if err != nil {
 		return false, err
@@ -50,7 +47,7 @@ func (r *Renderer) UpdateTerminalSize() (bool, error) {
 	return hasChanged, nil
 }
 
-func (r *Renderer) fill(style Style) {
+func (r *renderer) fill(style Style) {
 	for y := 0; y < r.height; y++ {
 		for x := 0; x < r.width; x++ {
 			r.rows[y][x] = cell{' ', 1, style}
@@ -58,15 +55,15 @@ func (r *Renderer) fill(style Style) {
 	}
 }
 
-func (r *Renderer) put(c cell, x, y int) {
+func (r *renderer) put(c cell, x, y int) {
 	if r.rows[y][x] != c {
 		r.rows[y][x] = c
 	}
 }
 
-func (r *Renderer) draw() {
+func (r *renderer) draw() {
 	origin()
-	lastStyle := DefaultStyle
+	lastStyle := Style{}
 	for y := 0; y < r.height; y++ {
 		if y != 0 {
 			csi("1B")

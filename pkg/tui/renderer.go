@@ -7,7 +7,7 @@ import (
 	"golang.org/x/term"
 )
 
-type Renderer struct {
+type renderer struct {
 	width               int
 	height              int
 	rows                [][]cell
@@ -19,14 +19,14 @@ type Renderer struct {
 	shouldSkipRendering bool
 }
 
-func NewRenderer() (*Renderer, error) {
+func newRenderer() (*renderer, error) {
 	ttyin := os.Stdin
 	state, err := term.MakeRaw(int(ttyin.Fd()))
 	if err != nil {
 		return nil, err
 	}
 	initRenderer()
-	return &Renderer{
+	return &renderer{
 		ttyin:     ttyin,
 		eventChan: make(chan any, 64),
 		oldState:  state,
@@ -40,7 +40,7 @@ func initRenderer() {
 	flush()
 }
 
-func (r *Renderer) Close() error {
+func (r *renderer) close() error {
 	showCursor()
 	rmcup()
 	csi("u")
@@ -52,7 +52,7 @@ func (r *Renderer) Close() error {
 	return nil
 }
 
-func (r *Renderer) fd() int {
+func (r *renderer) fd() int {
 	return int(r.ttyin.Fd())
 }
 

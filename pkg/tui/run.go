@@ -12,7 +12,7 @@ import (
 func Run(createView func() *View, options ...option) error {
 
 	cfg := config{
-		style: &DefaultStyle,
+		style: new(Style),
 	}
 	for _, opt := range options {
 		err := opt(&cfg)
@@ -21,12 +21,12 @@ func Run(createView func() *View, options ...option) error {
 		}
 	}
 
-	r, err := NewRenderer()
+	r, err := newRenderer()
 	if err != nil {
 		return fmt.Errorf("failed to init renderer: %w", err)
 	}
 	defer func() {
-		r.Close()
+		r.close()
 		for _, obj := range bufferForDebug {
 			fmt.Printf("%#v\n", obj)
 		}
@@ -102,7 +102,7 @@ func Run(createView func() *View, options ...option) error {
 			}
 		}
 
-		if changed, _ := r.UpdateTerminalSize(); changed {
+		if changed, _ := r.updateTerminalSize(); changed {
 			r.shouldSkipRendering = false
 		}
 
@@ -120,7 +120,7 @@ func Run(createView func() *View, options ...option) error {
 		v := ZStack(createView())
 
 		// Render views
-		err = renderView(r, v, cfg, rect{0, 0, r.width, r.height})
+		err = renderView(r, v, cfg, rect{0, 0, r.width, r.height}, *cfg.style)
 		if err != nil {
 			return fmt.Errorf("failed to render view: %w", err)
 		}
@@ -137,25 +137,50 @@ var Terminate = terminate{}
 
 var bufferForDebug = make([]any, 0)
 
-func renderView(r *Renderer, v *View, cfg config, frame rect) error {
+func mergeDefaultStyle(style *Style, defaultStyle Style) {
+	if style == nil {
+		style = &defaultStyle
+	} else {
+		if style.F256 == 0 {
+			style.F256 = defaultStyle.F256
+		}
+		if style.B256 == 0 {
+			style.B256 = defaultStyle.B256
+		}
+		if style.F256 == -1 {
+			style.B256 = defaultStyle.F256
+			style.F256 = defaultStyle.B256
+			if defaultStyle.B256 == 0 {
+				style.F256 = 15
+			}
+			if defaultStyle.F256 == 0 {
+				style.B256 = 15
+			}
+		}
+	}
+}
+
+func renderView(r *renderer, v *View, cfg config, frame rect, defaultStyle Style) error {
 	w, err := newViewRenderer(r, frame.x, frame.y, frame.width, frame.height, v.paddingTop, v.paddingLeading, v.paddingBottom, v.paddingTrailing)
 	if err != nil {
 		return fmt.Errorf("failed to create viewRenderer: %w", err)
 	}
 	if v.style == nil {
-		v.style = cfg.style
+		v.style = new(Style)
 	}
+	mergeDefaultStyle(v.style, defaultStyle)
 	if v.border != nil || v.title != "" || v.renderer != nil {
 		w.fill(cell{' ', 1, *v.style})
 	}
 	if v.border != nil {
+		mergeDefaultStyle(v.border, *v.style)
 		w.putBorder(*v.border)
 	}
 	if v.title != "" {
-		w.putTitle([]Text{{Str: " " + v.title + " ", Style: *v.style}})
+		w.putTitle([]text{{Str: " " + v.title + " ", Style: *v.style}})
 	}
 	if v.renderer != nil {
-		w.putBody(v.renderer(Size{Width: frame.width - v.paddingLeading - v.paddingTrailing, Height: frame.height - v.paddingTop - v.paddingBottom}))
+		w.putBody(v.renderer(), *v.style)
 	}
 
 	availableWidth := frame.width - v.paddingLeading - v.paddingTrailing
@@ -228,7 +253,7 @@ func renderView(r *Renderer, v *View, cfg config, frame rect) error {
 			y,
 			child.absoluteWidth,
 			child.absoluteHeight,
-		})
+		}, *v.style)
 		if err != nil {
 			return err
 		}

@@ -19,7 +19,7 @@ type View struct {
 	style           *Style
 	border          *Style
 	children        []*View
-	renderer        func(Size) []Text
+	renderer        func() []text
 	eventHandler    func(event any) any
 }
 
@@ -31,18 +31,27 @@ const (
 )
 
 func (v *View) RelativeSize(width, height int) *View {
+	if v == nil {
+		return nil
+	}
 	v.relativeWidth = width
 	v.relativeHeight = height
 	return v
 }
 
 func (v *View) AbsoluteSize(width, height int) *View {
+	if v == nil {
+		return nil
+	}
 	v.absoluteWidth = width
 	v.absoluteHeight = height
 	return v
 }
 
 func (v *View) Padding(top, leading, bottom, trailing int) *View {
+	if v == nil {
+		return nil
+	}
 	v.paddingTop = top
 	v.paddingLeading = leading
 	v.paddingBottom = bottom
@@ -51,17 +60,26 @@ func (v *View) Padding(top, leading, bottom, trailing int) *View {
 }
 
 func (v *View) Title(title string) *View {
+	if v == nil {
+		return nil
+	}
 	v.title = title
 	v.paddingTop = 2
 	return v
 }
 
 func (v *View) Style(style Style) *View {
+	if v == nil {
+		return nil
+	}
 	v.style = &style
 	return v
 }
 
-func (v *View) ForegroundColor(color int) *View {
+func (v *View) FGColor(color int) *View {
+	if v == nil {
+		return nil
+	}
 	if v.style == nil {
 		v.style = new(Style)
 	}
@@ -69,7 +87,10 @@ func (v *View) ForegroundColor(color int) *View {
 	return v
 }
 
-func (v *View) BackgroundColor(color int) *View {
+func (v *View) BGColor(color int) *View {
+	if v == nil {
+		return nil
+	}
 	if v.style == nil {
 		v.style = new(Style)
 	}
@@ -77,12 +98,32 @@ func (v *View) BackgroundColor(color int) *View {
 	return v
 }
 
-func (v *View) Border(style Style) *View {
+func BorderOptionFGColor(color int) func(*View) {
+	return func(v *View) {
+		v.border.F256 = color
+	}
+}
+
+func BorderOptionBGColor(color int) func(*View) {
+	return func(v *View) {
+		v.border.B256 = color
+	}
+}
+
+type borderOption = func(*View) error
+
+func (v *View) Border(options ...borderOption) *View {
+	if v == nil {
+		return nil
+	}
 	v.paddingTop = 2
 	v.paddingLeading = 2
 	v.paddingBottom = 2
 	v.paddingTrailing = 2
-	v.border = &style
+	v.border = new(Style)
+	for _, option := range options {
+		option(v)
+	}
 	return v
 }
 
@@ -96,7 +137,7 @@ func (v *View) Hidden(isHidden bool) *View {
 
 func TextView(body string) *View {
 	v := &View{}
-	v.renderer = func(s Size) []Text { return []Text{{Str: body, Style: *v.style}} }
+	v.renderer = func() []text { return []text{{Str: body, Style: *v.style}} }
 	return v
 }
 
@@ -120,21 +161,35 @@ func Span(s string) *View {
 	return &View{content: s}
 }
 
+func Cursor(s string) *View {
+	v := View{content: s}
+	v.style = new(Style)
+	v.style.HasCursor = true
+	return &v
+}
+
 func Fmt(format string, a ...any) *View {
 	return &View{content: fmt.Sprintf(format, a...)}
 }
 
+func Break() *View {
+	return &View{content: "\n"}
+}
+
 func P(views ...*View) *View {
-	return &View{renderer: func(s Size) []Text {
-		slice := make([]Text, 0)
+	return &View{renderer: func() []text {
+		slice := make([]text, 0)
 		for _, view := range views {
+			if view == nil {
+				continue
+			}
 			if view.renderer != nil {
-				slice = append(slice, view.renderer(s)...)
+				slice = append(slice, view.renderer()...)
 			} else {
 				if view.style != nil {
-					slice = append(slice, Text{Str: view.content, Style: *view.style})
+					slice = append(slice, text{Str: view.content, Style: *view.style})
 				} else {
-					slice = append(slice, Text{Str: view.content, Style: DefaultStyle})
+					slice = append(slice, text{Str: view.content})
 				}
 			}
 		}
@@ -148,6 +203,14 @@ func Map[T1 any, T2 any](slice []T1, fn func(T1) T2) []T2 {
 		slice2[idx] = fn(element)
 	}
 	return slice2
+}
+
+func MapN[T any](number int, fn func(int) T) []T {
+	slice := make([]T, number)
+	for i := 0; i < number; i++ {
+		slice[i] = fn(i)
+	}
+	return slice
 }
 
 func HMap[T any](slice []T, fn func(T) *View) *View {
@@ -166,14 +229,14 @@ func PMap[T any](slice []T, fn func(T) *View) *View {
 	return P(Map(slice, fn)...)
 }
 
+func PMapN(number int, fn func(int) *View) *View {
+	return P(MapN(number, fn)...)
+}
+
 func If[T any](condition bool, t T, f T) T {
 	if condition {
 		return t
 	} else {
 		return f
 	}
-}
-
-func CreateView(renderer func(Size) []Text) *View {
-	return &View{renderer: renderer}
 }

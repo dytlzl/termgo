@@ -61,9 +61,9 @@ func Run(ctx context.Context) error {
 	err := tui.Run(
 		func() *tui.View {
 			title := ""
-			body := func(tui.Size) []tui.Text { return nil }
+			body := func() *tui.View { return nil }
 			subViewTitle := ""
-			subViewBody := func(tui.Size) []tui.Text { return nil }
+			subViewBody := func() *tui.View { return nil }
 			if mode == "repo" {
 				title = "Repository Search"
 				if repoView.Result.Query != "" {
@@ -89,10 +89,10 @@ func Run(ctx context.Context) error {
 			}
 			return tui.VStack(
 				tui.ZStack(
-					tui.CreateView(body).Title(title).Border(tui.Style{F256: 255, B256: 0}),
+					body().Title(title).Border(),
 					tui.HStack(
 						tui.Spacer(),
-						tui.CreateView(subViewBody).Title(subViewTitle).Border(tui.Style{F256: 255, B256: 0}).Hidden(subViewTitle == ""),
+						subViewBody().Title(subViewTitle).Border().Hidden(subViewTitle == ""),
 					).Padding(2, 2, 2, 2),
 				),
 				tui.TextView(footerMessage).AbsoluteSize(0, 1).Style(tui.Style{F256: 15, B256: 135}).Padding(0, 1, 0, 1),

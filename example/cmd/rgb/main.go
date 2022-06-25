@@ -23,11 +23,11 @@ func rootView() *tui.View {
 					return tui.P(
 						tui.Span(" "),
 						tui.Fmt("%3d, %3d, %3d", r, g, b).
-							ForegroundColor(tui.If(color.RelativeBrightness(r, g, b) > 0.5, color.RGB(0, 0, 0), color.RGB(255, 255, 255))).
-							BackgroundColor(color.RGB(r, g, b)),
+							FGColor(tui.If(color.RelativeBrightness(r, g, b) > 0.5, color.RGB(0, 0, 0), color.RGB(255, 255, 255))).
+							BGColor(color.RGB(r, g, b)),
 					)
 				}).AbsoluteSize(0, 1)
 			})
 		}),
-	).Border(tui.DefaultStyle).Title("RGB").AbsoluteSize(89, 40)
+	).Border().Title("RGB").AbsoluteSize(89, 40)
 }
