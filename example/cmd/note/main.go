@@ -21,20 +21,20 @@ func rootView() *tui.View {
 	r, size := utf8.DecodeRuneInString(input[position:])
 	return tui.VStack(
 		tui.If(position == len(input),
-			tui.P(
-				tui.Span(input[:position]),
+			tui.InlineStack(
+				tui.String(input[:position]),
 				tui.Cursor(" ").FGColor(-1),
 			),
 			tui.If(r == '\n',
-				tui.P(
-					tui.Span(input[:position]),
+				tui.InlineStack(
+					tui.String(input[:position]),
 					tui.Cursor(" ").FGColor(-1),
-					tui.Span(input[position:]),
+					tui.String(input[position:]),
 				),
-				tui.P(
-					tui.Span(input[:position]),
+				tui.InlineStack(
+					tui.String(input[:position]),
 					tui.Cursor(input[position:position+size]).FGColor(-1),
-					tui.Span(input[position+size:]),
+					tui.String(input[position+size:]),
 				),
 			),
 		),

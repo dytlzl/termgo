@@ -14,7 +14,7 @@ func main() {
 var codes = make([]rune, 0)
 
 func rootView() *tui.View {
-	return tui.PMap(codes[:], func(r rune) *tui.View {
+	return tui.InlineMap(codes[:], func(r rune) *tui.View {
 		return tui.Fmt(" %d", int(r))
 	}).Border().RelativeSize(9, 9)
 }

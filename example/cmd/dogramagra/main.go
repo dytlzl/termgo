@@ -37,7 +37,7 @@ func main() {
 	}
 	err := tui.Run(func() *tui.View {
 		return tui.ZStack(
-			tui.String(dograMagra).RelativeSize(10, 10).Title("Dogra Magra").Border(),
+			tui.TextView(dograMagra).RelativeSize(10, 10).Title("Dogra Magra").Border(),
 			quitMenu.View().FGColor(-1).Hidden(!isOpenQuitMenu),
 		).BGColor(color.RGB(145, 0, 145))
 	},

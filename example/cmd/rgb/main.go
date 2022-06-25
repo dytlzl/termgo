@@ -17,8 +17,8 @@ func rootView() *tui.View {
 	return tui.VMap(values, func(r int) *tui.View {
 		return tui.VMap(values, func(g int) *tui.View {
 			return tui.HMap(values, func(b int) *tui.View {
-				return tui.P(
-					tui.Span(" "),
+				return tui.InlineStack(
+					tui.String(" "),
 					tui.Fmt("%3d, %3d, %3d", r, g, b).
 						FGColor(tui.If(color.RelativeBrightness(r, g, b) > 0.5, color.RGB(0, 0, 0), color.RGB(255, 255, 255))).
 						BGColor(color.RGB(r, g, b)),

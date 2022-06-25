@@ -14,13 +14,11 @@ type View struct {
 	paddingBottom   int
 	paddingTrailing int
 	title           string
-	content         string
 	dir             direction
 	style           *Style
 	border          *Style
 	children        []*View
 	renderer        func() []text
-	eventHandler    func(event any) any
 }
 
 type direction int
@@ -157,44 +155,43 @@ func ZStack(views ...*View) *View {
 	return &View{children: views}
 }
 
-func Span(s string) *View {
-	return &View{content: s}
+func String(s string) *View {
+	view := &View{}
+	view.renderer = func() []text {
+		return []text{{Str: s, Style: *view.style}}
+	}
+	return view
 }
 
 func Cursor(s string) *View {
-	v := View{content: s}
+	v := String(s)
 	v.style = new(Style)
 	v.style.HasCursor = true
-	return &v
+	return v
 }
 
 func Fmt(format string, a ...any) *View {
-	return &View{content: fmt.Sprintf(format, a...)}
+	return String(fmt.Sprintf(format, a...))
 }
 
 func Break() *View {
-	return &View{content: "\n"}
+	return String("\n")
 }
 
-func P(views ...*View) *View {
-	return &View{renderer: func() []text {
+func InlineStack(views ...*View) *View {
+	view := &View{}
+	view.renderer = func() []text {
 		slice := make([]text, 0)
-		for _, view := range views {
-			if view == nil {
-				continue
+		for _, child := range views {
+			if child.style == nil {
+				child.style = new(Style)
 			}
-			if view.renderer != nil {
-				slice = append(slice, view.renderer()...)
-			} else {
-				if view.style != nil {
-					slice = append(slice, text{Str: view.content, Style: *view.style})
-				} else {
-					slice = append(slice, text{Str: view.content})
-				}
-			}
+			mergeDefaultStyle(child.style, *view.style)
+			slice = append(slice, child.renderer()...)
 		}
 		return slice
-	}}
+	}
+	return view
 }
 
 func Map[T1 any, T2 any](slice []T1, fn func(T1) T2) []T2 {
@@ -225,12 +222,12 @@ func ZMap[T any](slice []T, fn func(T) *View) *View {
 	return VStack(Map(slice, fn)...)
 }
 
-func PMap[T any](slice []T, fn func(T) *View) *View {
-	return P(Map(slice, fn)...)
+func InlineMap[T any](slice []T, fn func(T) *View) *View {
+	return InlineStack(Map(slice, fn)...)
 }
 
-func PMapN(number int, fn func(int) *View) *View {
-	return P(MapN(number, fn)...)
+func InlineMapN(number int, fn func(int) *View) *View {
+	return InlineStack(MapN(number, fn)...)
 }
 
 func If[T any](condition bool, t T, f T) T {
