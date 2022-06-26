@@ -32,6 +32,9 @@ func TermSize() (int, int, error) {
 
 func (r *renderer) updateTerminalSize() (bool, error) {
 	width, height, err := term.GetSize(r.fd())
+	if !r.isAlternative {
+		height = r.height
+	}
 	if err != nil {
 		return false, err
 	}
@@ -62,7 +65,12 @@ func (r *renderer) put(c cell, x, y int) {
 }
 
 func (r *renderer) draw() {
-	origin()
+	if r.isAlternative {
+		origin()
+	} else {
+		csi(fmt.Sprintf("%dA", r.cursorY-1))
+		push("\r")
+	}
 	lastStyle := Style{}
 	for y := 0; y < r.height; y++ {
 		if y != 0 {
@@ -98,7 +106,12 @@ func (r *renderer) draw() {
 		}
 	}
 	push("\033[1;0m") // Reset Style
-	origin()
+	if r.isAlternative {
+		origin()
+	} else {
+		csi(fmt.Sprintf("%dA", r.height-1))
+		push("\r")
+	}
 	csi(fmt.Sprintf("%dB", r.cursorY))
 	csi(fmt.Sprintf("%dC", r.cursorX))
 	flush()

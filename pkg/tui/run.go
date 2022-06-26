@@ -10,10 +10,7 @@ import (
 )
 
 func Run(createView func() *View, options ...option) error {
-
-	cfg := config{
-		style: new(Style),
-	}
+	cfg := config{}
 	for _, opt := range options {
 		err := opt(&cfg)
 		if err != nil {
@@ -21,12 +18,14 @@ func Run(createView func() *View, options ...option) error {
 		}
 	}
 
-	r, err := newRenderer()
+	isAlternative := true
+
+	r, err := newRenderer(isAlternative)
 	if err != nil {
 		return fmt.Errorf("failed to init renderer: %w", err)
 	}
 	defer func() {
-		r.close()
+		r.close(isAlternative)
 		for _, obj := range bufferForDebug {
 			fmt.Printf("%#v\n", obj)
 		}
@@ -115,12 +114,12 @@ func Run(createView func() *View, options ...option) error {
 		}
 
 		// Clear
-		r.fill(*cfg.style)
+		r.fill(cfg.style)
 
 		v := ZStack(createView())
 
 		// Render views
-		err = renderView(r, v, cfg, rect{0, 0, r.width, r.height}, *cfg.style)
+		err = renderView(r, v, cfg, rect{0, 0, r.width, r.height}, cfg.style)
 		if err != nil {
 			return fmt.Errorf("failed to render view: %w", err)
 		}

@@ -3,11 +3,13 @@ package tui
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"golang.org/x/term"
 )
 
 type renderer struct {
+	isAlternative       bool
 	width               int
 	height              int
 	rows                [][]cell
@@ -19,36 +21,61 @@ type renderer struct {
 	shouldSkipRendering bool
 }
 
-func newRenderer() (*renderer, error) {
+func newRenderer(isAlternative bool) (*renderer, error) {
 	ttyin := os.Stdin
 	state, err := term.MakeRaw(int(ttyin.Fd()))
 	if err != nil {
 		return nil, err
 	}
-	initRenderer()
+	height := 15
+	if !isAlternative {
+		push(strings.Repeat("\n", height-2))
+		flush()
+	}
+	initRenderer(isAlternative)
 	return &renderer{
-		ttyin:     ttyin,
-		eventChan: make(chan any, 64),
-		oldState:  state,
+		isAlternative: isAlternative,
+		height:        If(isAlternative, 0, height),
+		cursorY:       If(isAlternative, 0, height-1),
+		ttyin:         ttyin,
+		eventChan:     make(chan any, 64),
+		oldState:      state,
 	}, nil
 }
 
-func initRenderer() {
+func initRenderer(isAlternative bool) {
 	csi("s")
-	smcup()
+	if isAlternative {
+		smcup()
+	}
 	hideCursor()
 	flush()
 }
 
-func (r *renderer) close() error {
+func (r *renderer) close(isAlternative bool) error {
 	showCursor()
-	rmcup()
-	csi("u")
-	flush()
-	err := term.Restore(r.fd(), r.oldState)
-	if err != nil {
-		return err
+	if isAlternative {
+		rmcup()
+		csi("u")
+		flush()
+		err := term.Restore(r.fd(), r.oldState)
+		if err != nil {
+			return err
+		}
+	} else {
+		csi(fmt.Sprintf("%dB", r.height-r.cursorY-2))
+		push("\n")
+		flush()
+		csi("1A")
+		flush()
+		err := term.Restore(r.fd(), r.oldState)
+		push("\n")
+		flush()
+		if err != nil {
+			return err
+		}
 	}
+
 	return nil
 }
 
@@ -85,6 +112,10 @@ func showCursor() {
 
 func hideCursor() {
 	csi("?25l")
+}
+
+func clearAll() {
+	csi("2J")
 }
 
 func origin() {

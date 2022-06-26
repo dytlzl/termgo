@@ -2,7 +2,7 @@ package tui
 
 type config struct {
 	channel      chan any
-	style        *Style
+	style        Style
 	eventHandler func(any) any
 }
 
@@ -15,7 +15,7 @@ func OptionChannel(ch chan any) func(*config) error {
 
 func OptionStyle(style Style) func(*config) error {
 	return func(c *config) error {
-		c.style = &style
+		c.style = style
 		return nil
 	}
 }
