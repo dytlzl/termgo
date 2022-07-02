@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/dytlzl/tervi/pkg/color"
 	"github.com/dytlzl/tervi/pkg/tui"
 )
 
@@ -19,7 +20,7 @@ func rootView() *tui.View {
 					tui.VStack().Border(),
 					tui.VStack().Border(),
 				),
-				tui.HStack().Border(),
+				tui.HStack().Border(tui.BorderOptionFGColor(color.RGB(200, 100, 100))),
 			),
 			tui.VStack().Border(),
 		),

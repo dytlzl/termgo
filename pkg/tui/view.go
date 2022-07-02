@@ -132,7 +132,7 @@ func BorderOptionBGColor(color int) func(*View) {
 	}
 }
 
-type borderOption = func(*View) error
+type borderOption = func(*View)
 
 func (v *View) Border(options ...borderOption) *View {
 	if v == nil {
@@ -208,7 +208,7 @@ func InlineStack(views ...*View) *View {
 		slice := make([]text, 0)
 		for _, child := range views {
 			if child == nil {
-				return nil
+				continue
 			}
 			if child.style == nil {
 				child.style = new(Style)
