@@ -33,24 +33,24 @@ func NewRepoSearchView() *RepoSearchView {
 	}
 }
 
-func (m *RepoSearchView) Body(tui.Size) []tui.Text {
+func (m *RepoSearchView) Body() *tui.View {
 	style := tui.Style{F256: 255, B256: 0}
 	cursorStyle := tui.Style{F256: 93, B256: style.F256, HasCursor: true}
 
-	slice := make([]tui.Text, 0, len(m.Result.Repositories)+10)
-	slice = append(slice, tui.Text{Str: "Query > ", Style: tui.Style{F256: 135, B256: style.B256}})
+	slice := make([]*tui.View, 0, len(m.Result.Repositories)+10)
+	slice = append(slice, tui.String("Query > ").Style(tui.Style{F256: 135, B256: style.B256}))
 	if m.position == len(m.input) {
-		slice = append(slice, []tui.Text{
-			{Str: m.input[:m.position], Style: style},
-			{Str: " ", Style: cursorStyle},
-		}...)
+		slice = append(slice,
+			tui.String(m.input[:m.position]),
+			tui.String(" ").Style(cursorStyle),
+		)
 	} else {
 		_, size := utf8.DecodeRuneInString(m.input[m.position:])
-		slice = append(slice, []tui.Text{
-			{Str: m.input[:m.position], Style: style},
-			{Str: m.input[m.position : m.position+size], Style: cursorStyle},
-			{Str: m.input[m.position+size:], Style: style},
-		}...)
+		slice = append(slice,
+			tui.String(m.input[:m.position]),
+			tui.String(m.input[m.position:m.position+size]).Style(cursorStyle),
+			tui.String(m.input[m.position+size:]),
+		)
 	}
 	if m.Result.Query != "" {
 		if m.selectedRepository >= len(m.Result.Repositories) {
@@ -59,24 +59,28 @@ func (m *RepoSearchView) Body(tui.Size) []tui.Text {
 		if m.selectedRepository < 0 {
 			m.selectedRepository = 0
 		}
-		slice = append(slice, tui.Text{Str: "\n\n", Style: style})
+		slice = append(slice, tui.Break(), tui.Break())
 		lastOrigin := ""
 		for i, repo := range m.Result.Repositories {
 			if repo.Origin != lastOrigin {
-				slice = append(slice, tui.Text{Str: " " + repo.Origin + ":\n", Style: tui.Style{F256: 8, B256: style.B256}})
+				slice = append(slice, tui.String(" "+repo.Origin+":\n").Style(tui.Style{F256: 8, B256: style.B256}))
 				lastOrigin = repo.Origin
 			}
 			if i == m.selectedRepository {
-				slice = append(slice, tui.Text{Str: "> ", Style: tui.Style{F256: 8, B256: style.B256}})
-				slice = append(slice, tui.Text{Str: fmt.Sprintf(" #%d", i), Style: tui.Style{F256: 8, B256: 163}})
-				slice = append(slice, tui.Text{Str: fmt.Sprintf(" %s \n", repo.FullName), Style: tui.Style{F256: 255, B256: 163}})
+				slice = append(slice,
+					tui.String("> ").Style(tui.Style{F256: 8, B256: style.B256}),
+					tui.Fmt(" #%d", i).Style(tui.Style{F256: 8, B256: 163}),
+					tui.Fmt(" %s \n", repo.FullName).Style(tui.Style{F256: 255, B256: 163}),
+				)
 			} else {
-				slice = append(slice, tui.Text{Str: fmt.Sprintf("   #%d", i), Style: tui.Style{F256: 8, B256: style.B256}})
-				slice = append(slice, tui.Text{Str: fmt.Sprintf(" %s \n", repo.FullName), Style: style})
+				slice = append(slice,
+					tui.Fmt("   #%d", i).Style(tui.Style{F256: 8, B256: style.B256}),
+					tui.Fmt(" %s \n", repo.FullName),
+				)
 			}
 		}
 	}
-	return slice
+	return tui.InlineStack(slice...).Style(style)
 }
 
 func (m *RepoSearchView) HandleEvent(event any) any {
@@ -171,21 +175,25 @@ type RepoSubView struct {
 	readMe string
 }
 
-func (m *RepoSubView) Body(tui.Size) []tui.Text {
+func (m *RepoSubView) Body() *tui.View {
 	style := tui.Style{F256: 255, B256: 0}
 	keyStyle := tui.Style{F256: 135, B256: style.B256}
-	slice := make([]tui.Text, 0, 5)
-
-	if m.repo.Description != "" {
-		slice = append(slice, tui.Text{Str: "Description: \n ", Style: keyStyle})
-		slice = append(slice, tui.Text{Str: m.repo.Description + "\n\n", Style: style})
-
-	}
-	if m.readMe != "" {
-		slice = append(slice, tui.Text{Str: "README: \n ", Style: keyStyle})
-		slice = append(slice, tui.Text{Str: m.readMe + "\n", Style: style})
-	}
-	return slice
+	return tui.InlineStack(
+		tui.If(m.repo.Description != "",
+			tui.InlineStack(
+				tui.String("Description: \n ").Style(keyStyle),
+				tui.String(m.repo.Description+"\n\n").Style(style),
+			),
+			nil,
+		),
+		tui.If(m.readMe != "",
+			tui.InlineStack(
+				tui.String("README: \n ").Style(keyStyle),
+				tui.String(m.readMe+"\n").Style(style),
+			),
+			nil,
+		),
+	)
 }
 
 type CodeSearchView struct {
@@ -208,24 +216,24 @@ func NewCodeSearchView() *CodeSearchView {
 	}
 }
 
-func (m *CodeSearchView) Body(size tui.Size) []tui.Text {
+func (m *CodeSearchView) Body() *tui.View {
 	style := tui.Style{F256: 255, B256: 0}
 	cursorStyle := tui.Style{F256: 93, B256: style.F256, HasCursor: true}
 
-	slice := make([]tui.Text, 0, len(m.Result.Items)+10)
-	slice = append(slice, tui.Text{Str: "Query > ", Style: tui.Style{F256: 135, B256: style.B256}})
+	slice := make([]*tui.View, 0, len(m.Result.Items)+10)
+	slice = append(slice, tui.String("Query > ").Style(tui.Style{F256: 135, B256: style.B256}))
 	if m.position == len(m.input) {
-		slice = append(slice, []tui.Text{
-			{Str: m.input[:m.position], Style: style},
-			{Str: " ", Style: cursorStyle},
-		}...)
+		slice = append(slice,
+			tui.String(m.input[:m.position]),
+			tui.String(" ").Style(cursorStyle),
+		)
 	} else {
 		_, size := utf8.DecodeRuneInString(m.input[m.position:])
-		slice = append(slice, []tui.Text{
-			{Str: m.input[:m.position], Style: style},
-			{Str: m.input[m.position : m.position+size], Style: cursorStyle},
-			{Str: m.input[m.position+size:], Style: style},
-		}...)
+		slice = append(slice,
+			tui.String(m.input[:m.position]),
+			tui.String(m.input[m.position:m.position+size]).Style(cursorStyle),
+			tui.String(m.input[m.position+size:]),
+		)
 	}
 	if m.Result.Query != "" {
 		if m.selectedItem >= len(m.Result.Items) {
@@ -234,36 +242,41 @@ func (m *CodeSearchView) Body(size tui.Size) []tui.Text {
 		if m.selectedItem < 0 {
 			m.selectedItem = 0
 		}
-		slice = append(slice, tui.Text{Str: "\n\n", Style: style})
+		slice = append(slice, tui.Break(), tui.Break())
 		lastOrigin := ""
+		width, _, _ := tui.TermSize()
 		for i, item := range m.Result.Items {
 			if item.Origin() != lastOrigin {
-				slice = append(slice, tui.Text{Str: " " + item.Origin() + ":\n", Style: tui.Style{F256: 8, B256: style.B256}})
+				slice = append(slice, tui.String(" "+item.Origin()+":\n").Style(tui.Style{F256: 8, B256: style.B256}))
 				lastOrigin = item.Origin()
 			}
 			path := item.Path
-			if size.Width/3-len(item.Repository.FullName)-15 < 0 {
+			if width/3-len(item.Repository.FullName)-15 < 0 {
 				path = ""
-			} else if len(path) > size.Width/3-len(item.Repository.FullName)-15 {
-				for len(path) > size.Width/3-len(item.Repository.FullName)-15 {
+			} else if len(path) > width/3-len(item.Repository.FullName)-15 {
+				for len(path) > width/3-len(item.Repository.FullName)-15 {
 					_, size := utf8.DecodeLastRuneInString(path)
 					path = path[:len(path)-size]
 				}
 				path += "..."
 			}
 			if i == m.selectedItem {
-				slice = append(slice, tui.Text{Str: "> ", Style: tui.Style{F256: 8, B256: style.B256}})
-				slice = append(slice, tui.Text{Str: fmt.Sprintf(" #%d ", i), Style: tui.Style{F256: 8, B256: 163}})
-				slice = append(slice, tui.Text{Str: item.Repository.FullName, Style: tui.Style{F256: 225, B256: 163}})
-				slice = append(slice, tui.Text{Str: fmt.Sprintf(" %s \n", path), Style: tui.Style{F256: 255, B256: 163}})
+				slice = append(slice,
+					tui.String("> ").Style(tui.Style{F256: 8, B256: style.B256}),
+					tui.Fmt(" #%d ", i).Style(tui.Style{F256: 8, B256: 163}),
+					tui.String(item.Repository.FullName).Style(tui.Style{F256: 225, B256: 163}),
+					tui.Fmt(" %s \n", path).Style(tui.Style{F256: 255, B256: 163}),
+				)
 			} else {
-				slice = append(slice, tui.Text{Str: fmt.Sprintf("   #%d ", i), Style: tui.Style{F256: 8, B256: style.B256}})
-				slice = append(slice, tui.Text{Str: item.Repository.FullName, Style: tui.Style{F256: 225, B256: style.B256}})
-				slice = append(slice, tui.Text{Str: fmt.Sprintf(" %s \n", path), Style: style})
+				slice = append(slice,
+					tui.Fmt("   #%d ", i).Style(tui.Style{F256: 8, B256: style.B256}),
+					tui.String(item.Repository.FullName).Style(tui.Style{F256: 225, B256: style.B256}),
+					tui.Fmt(" %s \n", path),
+				)
 			}
 		}
 	}
-	return slice
+	return tui.InlineStack(slice...).Style(style)
 }
 
 func (m *CodeSearchView) HandleEvent(event any) any {
@@ -339,24 +352,20 @@ func (m *CodeSearchView) SubView() *CodeSubView {
 			requestChannel <- item
 			m.ContentRequestMap[item.Url] = true
 		}
-		return &CodeSubView{item: item, content: m.ContentMap[item.Url], query: m.Result.Query, runeMode: m.runeMode}
+		return &CodeSubView{item: item, content: m.ContentMap[item.Url], query: m.Result.Query}
 	}
 	return nil
 }
 
 type CodeSubView struct {
-	content  string
-	query    string
-	item     SearchResultItem
-	runeMode bool
+	content string
+	query   string
+	item    SearchResultItem
 }
 
-func (m *CodeSubView) Body(size tui.Size) []tui.Text {
-	if m.runeMode {
-		return m.Body_RuneMode(false)
-	}
+func (m *CodeSubView) Body() *tui.View {
 	if m.content == "" {
-		return []tui.Text{{Str: "Loading...", Style: tui.Style{F256: 135, B256: 0}}}
+		return tui.String("Loading...").Style(tui.Style{F256: 135, B256: 0})
 	}
 	content := strings.ReplaceAll(m.content, string(rune(9)), "    ")
 	lines := strings.Split(content, "\n")
@@ -373,8 +382,9 @@ func (m *CodeSubView) Body(size tui.Size) []tui.Text {
 	if col == -1 {
 		row = 0
 	}
-	beginRow := row - size.Height/2
-	endRow := row + size.Height/2
+	_, height, _ := tui.TermSize()
+	beginRow := row - height/2
+	endRow := row + height/2
 	if beginRow < 0 {
 		endRow -= beginRow
 		beginRow = 0
@@ -386,36 +396,23 @@ func (m *CodeSubView) Body(size tui.Size) []tui.Text {
 		}
 		endRow = len(lines) - 1
 	}
-	slice := make([]tui.Text, 0, 64)
 	lineNumberWidth := len(strconv.Itoa(endRow + 1))
-	for i := beginRow; i <= endRow; i++ {
-		slice = append(slice, tui.Text{Str: fmt.Sprintf(fmt.Sprintf("%%%dd ", lineNumberWidth), i+1), Style: tui.Style{F256: 135, B256: 0}})
-		index := strings.Index(lines[i], m.query)
+	return tui.InlineMapN(endRow-beginRow+1, func(i int) *tui.View {
+		rowNumber := beginRow + i
+		index := strings.Index(lines[rowNumber], m.query)
 		if index == -1 {
-			slice = append(slice, tui.Text{Str: lines[i] + "\n", Style: tui.DefaultStyle})
-		} else {
-			slice = append(slice, tui.Text{Str: lines[i][:index], Style: tui.DefaultStyle})
-			slice = append(slice, tui.Text{Str: lines[i][index : index+len(m.query)], Style: tui.Style{B256: 163}})
-			slice = append(slice, tui.Text{Str: lines[i][index+len(m.query):] + "\n", Style: tui.DefaultStyle})
+			return tui.InlineStack(
+				tui.Fmt(fmt.Sprintf("%%%dd ", lineNumberWidth), rowNumber+1).Style(tui.Style{F256: 135, B256: 0}),
+				tui.String(lines[rowNumber]+"\n"),
+			)
 		}
-	}
-	return slice
-}
-
-func (m *CodeSubView) Body_RuneMode(bool) []tui.Text {
-	if m.content == "" {
-		return []tui.Text{{Str: "Loading...", Style: tui.Style{F256: 135, B256: 0}}}
-	}
-	slice := make([]tui.Text, 0, 2048)
-	lineNumber := 0
-	slice = append(slice, tui.Text{Str: fmt.Sprintf("%3d ", lineNumber), Style: tui.Style{F256: 135, B256: 0}})
-	for _, r := range m.content {
-		slice = append(slice, tui.Text{Str: " " + strconv.Itoa(int(r)), Style: tui.DefaultStyle})
-		if r == '\n' {
-			lineNumber++
-			slice = append(slice, tui.Text{Str: "\n", Style: tui.DefaultStyle})
-			slice = append(slice, tui.Text{Str: fmt.Sprintf("%3d ", lineNumber), Style: tui.Style{F256: 135, B256: 0}})
-		}
-	}
-	return slice
+		return tui.InlineStack(
+			tui.Fmt(fmt.Sprintf("%%%dd ", lineNumberWidth), rowNumber+1).Style(tui.Style{F256: 135, B256: 0}),
+			tui.InlineStack(
+				tui.String(lines[rowNumber][:index]),
+				tui.String(lines[rowNumber][index:index+len(m.query)]).BGColor(163),
+				tui.String(lines[rowNumber][index+len(m.query):]+"\n"),
+			),
+		)
+	})
 }
