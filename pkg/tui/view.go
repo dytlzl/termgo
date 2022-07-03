@@ -5,19 +5,21 @@ import (
 )
 
 type View struct {
-	relativeWidth   int
-	relativeHeight  int
 	absoluteWidth   int
 	absoluteHeight  int
-	paddingTop      int
-	paddingLeading  int
-	paddingBottom   int
-	paddingTrailing int
+	relativeWidth   uint8
+	relativeHeight  uint8
+	paddingTop      uint8
+	paddingLeading  uint8
+	paddingBottom   uint8
+	paddingTrailing uint8
+	priority        int8
 	title           string
 	dir             direction
 	style           *Style
 	border          *Style
 	children        []*View
+	keyHandler      func(rune) any
 	renderer        func() []text
 }
 
@@ -31,7 +33,7 @@ const (
 // RelativeSize specifies relative width and height of units that the view used.
 // The maximum number allowed is 12(100% of the parent view),
 // and 0 means auto-resizing.
-func (v *View) RelativeSize(width, height int) *View {
+func (v *View) RelativeSize(width, height uint8) *View {
 	if v == nil {
 		return nil
 	}
@@ -56,11 +58,11 @@ func (v *View) AbsoluteSize(width, height int) *View {
 // When two values are specified, the first padding applies to the top and bottom, the second to the left and right.
 // When three values are specified, the first padding applies to the top, the second to the right and left, the third to the bottom.
 // When four values are specified, the paddings apply to the top, right, bottom, and left in that order (clockwise).
-func (v *View) Padding(values ...int) *View {
+func (v *View) Padding(values ...uint8) *View {
 	if v == nil {
 		return nil
 	}
-	top, leading, bottom, trailing := 0, 0, 0, 0
+	var top, leading, bottom, trailing uint8
 	switch len(values) {
 	case 1:
 		top, leading, bottom, trailing = values[0], values[0], values[0], values[0]
@@ -180,20 +182,6 @@ func (v *View) Strikethrough() *View {
 	return v
 }
 
-func BorderOptionFGColor(color uint8) func(*View) {
-	return func(v *View) {
-		v.border.F256 = color
-	}
-}
-
-func BorderOptionBGColor(color uint8) func(*View) {
-	return func(v *View) {
-		v.border.B256 = color
-	}
-}
-
-type borderOption = func(*View)
-
 func (v *View) Border(options ...borderOption) *View {
 	if v == nil {
 		return nil
@@ -209,6 +197,14 @@ func (v *View) Border(options ...borderOption) *View {
 	return v
 }
 
+func (v *View) KeyHandler(fn func(rune) any) *View {
+	if v == nil {
+		return nil
+	}
+	v.keyHandler = fn
+	return v
+}
+
 func (v *View) Hidden(isHidden bool) *View {
 	if isHidden {
 		return nil
@@ -216,6 +212,20 @@ func (v *View) Hidden(isHidden bool) *View {
 		return v
 	}
 }
+
+func BorderOptionFGColor(color uint8) func(*View) {
+	return func(v *View) {
+		v.border.F256 = color
+	}
+}
+
+func BorderOptionBGColor(color uint8) func(*View) {
+	return func(v *View) {
+		v.border.B256 = color
+	}
+}
+
+type borderOption = func(*View)
 
 func TextView(body string) *View {
 	v := &View{}

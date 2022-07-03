@@ -3,6 +3,7 @@ package tui
 type config struct {
 	channel      chan any
 	style        Style
+	focusedView  *View
 	eventHandler func(any) any
 }
 

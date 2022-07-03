@@ -1,40 +1,10 @@
 package main
 
 import (
-	"strings"
-
-	"github.com/dytlzl/tervi/pkg/color"
-	"github.com/dytlzl/tervi/pkg/key"
 	"github.com/dytlzl/tervi/pkg/tui"
 )
 
 func main() {
-	quitMenu := new(QuitMenu)
-	isOpenQuitMenu := false
-	handleEvent := func(event any) any {
-		switch typed := event.(type) {
-		case rune:
-			if isOpenQuitMenu {
-				switch typed {
-				case key.Esc:
-					isOpenQuitMenu = false
-				case key.ArrowLeft:
-					quitMenu.IsYes = true
-				case key.ArrowRight:
-					quitMenu.IsYes = false
-				case key.Enter:
-					return tui.Terminate
-				}
-			} else {
-				switch typed {
-				case 'q', key.Esc:
-					quitMenu.IsYes = false
-					isOpenQuitMenu = true
-				}
-			}
-		}
-		return nil
-	}
 	err := tui.Run(func() *tui.View {
 		return tui.ZStack(
 			tui.InlineStack(
@@ -43,29 +13,11 @@ func main() {
 				tui.String(dograMagra3).Underline(),
 				tui.String(dograMagra4).Strikethrough(),
 			).RelativeSize(10, 10).Title("ドグラマグラ - 夢野久作").Border(),
-			quitMenu.View().Invert(true).Hidden(!isOpenQuitMenu),
-		).BGColor(color.RGB(145, 0, 145))
-	},
-		tui.OptionEventHandler(handleEvent),
-	)
+		)
+	})
 	if err != nil {
 		panic(err)
 	}
-}
-
-type QuitMenu struct {
-	IsYes bool
-}
-
-func (q *QuitMenu) View() *tui.View {
-	return tui.InlineStack(
-		tui.Fmt("%sAre you sure to quit?\n\n%s     ",
-			strings.Repeat(" ", (32-21)/2),
-			strings.Repeat(" ", (32-21)/2)),
-		tui.String(" Yes ").Invert(q.IsYes),
-		tui.String(" "),
-		tui.String(" No ").Invert(q.IsYes),
-	).AbsoluteSize(36, 7).Title("Quit").Border()
 }
 
 const (
