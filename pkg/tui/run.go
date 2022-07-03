@@ -179,32 +179,6 @@ var Terminate = terminate{}
 
 var bufferForDebug = make([]any, 0)
 
-func mergeDefaultStyle(style *Style, defaultStyle Style) {
-	if style == nil {
-		style = &defaultStyle
-	} else {
-		if style.F256 == 0 {
-			style.F256 = defaultStyle.F256
-		}
-		if style.B256 == 0 {
-			style.B256 = defaultStyle.B256
-		}
-		if !style.strikethrough {
-			style.strikethrough = defaultStyle.strikethrough
-		}
-		if style.invert {
-			style.B256 = defaultStyle.F256
-			style.F256 = defaultStyle.B256
-			if defaultStyle.B256 == 0 {
-				style.F256 = 15
-			}
-			if defaultStyle.F256 == 0 {
-				style.B256 = 15
-			}
-		}
-	}
-}
-
 func renderView(r *renderer, v *View, cfg config, frame rect, defaultStyle Style) error {
 	w, err := newViewRenderer(r, frame.x, frame.y, frame.width, frame.height, v.paddingTop, v.paddingLeading, v.paddingBottom, v.paddingTrailing)
 	if err != nil {
@@ -213,12 +187,12 @@ func renderView(r *renderer, v *View, cfg config, frame rect, defaultStyle Style
 	if v.style == nil {
 		v.style = new(Style)
 	}
-	mergeDefaultStyle(v.style, defaultStyle)
+	v.style.merge(defaultStyle)
 	if v.border != nil || v.title != "" || v.renderer != nil {
 		w.fill(cell{' ', 1, *v.style})
 	}
 	if v.border != nil {
-		mergeDefaultStyle(v.border, *v.style)
+		v.border.merge(*v.style)
 		w.putBorder(*v.border)
 	}
 	if v.title != "" {

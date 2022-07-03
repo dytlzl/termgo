@@ -273,7 +273,7 @@ func InlineStack(views ...*View) *View {
 			if child.style == nil {
 				child.style = new(Style)
 			}
-			mergeDefaultStyle(child.style, *view.style)
+			child.style.merge(*view.style)
 			slice = append(slice, child.renderer()...)
 		}
 		return slice

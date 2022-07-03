@@ -28,7 +28,7 @@ func newViewRenderer(r *renderer, x, y, width, height, paddingTop, paddingLeadin
 func (w *viewRenderer) putBody(slice []text, defaultStyle Style) {
 	x, y := 0, 0
 	for _, as := range slice {
-		mergeDefaultStyle(&as.Style, defaultStyle)
+		as.Style.merge(defaultStyle)
 		for _, r := range as.Str {
 			if r == 13 { // CR
 				continue
