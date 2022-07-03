@@ -10,7 +10,7 @@ func TestRGB(t *testing.T) {
 		red   int
 		green int
 		blue  int
-		want  int
+		want  uint8
 	}{
 		{
 			name:  "red",

@@ -97,7 +97,7 @@ func (v *View) Style(style Style) *View {
 }
 
 // FGColor sets a foreground color to the view.
-func (v *View) FGColor(color int) *View {
+func (v *View) FGColor(color uint8) *View {
 	if v == nil {
 		return nil
 	}
@@ -109,7 +109,7 @@ func (v *View) FGColor(color int) *View {
 }
 
 // BGColor sets a background color to the view.
-func (v *View) BGColor(color int) *View {
+func (v *View) BGColor(color uint8) *View {
 	if v == nil {
 		return nil
 	}
@@ -120,13 +120,73 @@ func (v *View) BGColor(color int) *View {
 	return v
 }
 
-func BorderOptionFGColor(color int) func(*View) {
+// Invert inverts foreground color and background color.
+func (v *View) Invert(b bool) *View {
+	if v == nil {
+		return nil
+	}
+	if v.style == nil {
+		v.style = new(Style)
+	}
+	v.style.invert = b
+	return v
+}
+
+// Bold sets bold style to the view.
+func (v *View) Bold() *View {
+	if v == nil {
+		return nil
+	}
+	if v.style == nil {
+		v.style = new(Style)
+	}
+	v.style.bold = true
+	return v
+}
+
+// Italic sets italic style to the view.
+func (v *View) Italic() *View {
+	if v == nil {
+		return nil
+	}
+	if v.style == nil {
+		v.style = new(Style)
+	}
+	v.style.italic = true
+	return v
+}
+
+// Underline sets underline style to the view.
+func (v *View) Underline() *View {
+	if v == nil {
+		return nil
+	}
+	if v.style == nil {
+		v.style = new(Style)
+	}
+	v.style.underline = true
+	return v
+}
+
+// Strikethrough sets strikethourgh style to the view.
+func (v *View) Strikethrough() *View {
+	if v == nil {
+		return nil
+	}
+	if v.style == nil {
+		v.style = new(Style)
+	}
+	v.style.strikethrough = true
+	return v
+}
+
+func BorderOptionFGColor(color uint8) func(*View) {
 	return func(v *View) {
 		v.border.F256 = color
 	}
 }
 
-func BorderOptionBGColor(color int) func(*View) {
+func BorderOptionBGColor(color uint8) func(*View) {
 	return func(v *View) {
 		v.border.B256 = color
 	}
@@ -163,7 +223,7 @@ func TextView(body string) *View {
 	return v
 }
 
-func Spacer(views ...*View) *View {
+func Spacer() *View {
 	return &View{}
 }
 

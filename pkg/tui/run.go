@@ -189,7 +189,10 @@ func mergeDefaultStyle(style *Style, defaultStyle Style) {
 		if style.B256 == 0 {
 			style.B256 = defaultStyle.B256
 		}
-		if style.F256 == -1 {
+		if !style.strikethrough {
+			style.strikethrough = defaultStyle.strikethrough
+		}
+		if style.invert {
 			style.B256 = defaultStyle.F256
 			style.F256 = defaultStyle.B256
 			if defaultStyle.B256 == 0 {

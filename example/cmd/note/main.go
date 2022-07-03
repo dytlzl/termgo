@@ -23,17 +23,17 @@ func rootView() *tui.View {
 		tui.If(position == len(input),
 			tui.InlineStack(
 				tui.String(input[:position]),
-				tui.Cursor(" ").FGColor(-1),
+				tui.Cursor(" ").Invert(true),
 			),
 			tui.If(r == '\n',
 				tui.InlineStack(
 					tui.String(input[:position]),
-					tui.Cursor(" ").FGColor(-1),
+					tui.Cursor(" ").Invert(true),
 					tui.String(input[position:]),
 				),
 				tui.InlineStack(
 					tui.String(input[:position]),
-					tui.Cursor(input[position:position+size]).FGColor(-1),
+					tui.Cursor(input[position:position+size]).Invert(true),
 					tui.String(input[position+size:]),
 				),
 			),

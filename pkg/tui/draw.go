@@ -18,15 +18,7 @@ type text struct {
 	Style Style
 }
 
-type Style struct {
-	Foreground int
-	Background int
-	F256       int
-	B256       int
-	HasCursor  bool
-}
-
-func TermSize() (int, int, error) {
+func TermSize() (width int, height int, err error) {
 	return term.GetSize(int(os.Stdin.Fd()))
 }
 
@@ -79,23 +71,30 @@ func (r *renderer) draw() {
 		}
 		for x := 0; x < r.width; x++ {
 			style := r.rows[y][x].Style
-			if lastStyle.Foreground != style.Foreground ||
-				lastStyle.Background != style.Background ||
-				lastStyle.F256 != style.F256 ||
-				lastStyle.B256 != style.B256 {
+			if style != lastStyle {
 				push("\033[1;0m")
 				if style.F256 != 0 {
 					push(fmt.Sprintf("\033[38;5;%dm", style.F256))
-				} else if style.Foreground != 0 {
-					push(fmt.Sprintf("\033[1;%dm", style.Foreground))
 				}
 				if style.B256 != 0 {
 					push(fmt.Sprintf("\033[48;5;%dm", style.B256))
-				} else if style.Background != 0 {
-					push(fmt.Sprintf("\033[1;%dm", style.Background))
 				}
+				if style.bold {
+					push("\033[1m")
+				}
+				if style.italic {
+					push("\033[3m")
+				}
+				if style.underline {
+					push("\033[4m")
+				}
+				if style.strikethrough {
+					push("\033[9m")
+				}
+
 				lastStyle = style
 			}
+
 			if style.HasCursor {
 				r.cursorY = y
 				r.cursorX = x

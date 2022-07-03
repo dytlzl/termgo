@@ -2,8 +2,8 @@ package color
 
 import "math"
 
-func RGB(red, green, blue int) int {
-	return 16 + 36*valueToIndex(red) + 6*valueToIndex(green) + valueToIndex(blue)
+func RGB(red, green, blue int) uint8 {
+	return uint8(16 + 36*valueToIndex(red) + 6*valueToIndex(green) + valueToIndex(blue))
 }
 
 func RelativeBrightness(red, green, blue int) float64 {
