@@ -5,19 +5,21 @@ import (
 )
 
 type View struct {
-	relativeWidth   int
-	relativeHeight  int
 	absoluteWidth   int
 	absoluteHeight  int
-	paddingTop      int
-	paddingLeading  int
-	paddingBottom   int
-	paddingTrailing int
+	relativeWidth   uint8
+	relativeHeight  uint8
+	paddingTop      uint8
+	paddingLeading  uint8
+	paddingBottom   uint8
+	paddingTrailing uint8
+	priority        int8
 	title           string
 	dir             direction
-	style           *Style
-	border          *Style
+	style           *style
+	border          *style
 	children        []*View
+	keyHandler      func(rune) any
 	renderer        func() []text
 }
 
@@ -31,7 +33,7 @@ const (
 // RelativeSize specifies relative width and height of units that the view used.
 // The maximum number allowed is 12(100% of the parent view),
 // and 0 means auto-resizing.
-func (v *View) RelativeSize(width, height int) *View {
+func (v *View) RelativeSize(width, height uint8) *View {
 	if v == nil {
 		return nil
 	}
@@ -56,11 +58,11 @@ func (v *View) AbsoluteSize(width, height int) *View {
 // When two values are specified, the first padding applies to the top and bottom, the second to the left and right.
 // When three values are specified, the first padding applies to the top, the second to the right and left, the third to the bottom.
 // When four values are specified, the paddings apply to the top, right, bottom, and left in that order (clockwise).
-func (v *View) Padding(values ...int) *View {
+func (v *View) Padding(values ...uint8) *View {
 	if v == nil {
 		return nil
 	}
-	top, leading, bottom, trailing := 0, 0, 0, 0
+	var top, leading, bottom, trailing uint8
 	switch len(values) {
 	case 1:
 		top, leading, bottom, trailing = values[0], values[0], values[0], values[0]
@@ -88,51 +90,96 @@ func (v *View) Title(title string) *View {
 	return v
 }
 
-func (v *View) Style(style Style) *View {
-	if v == nil {
-		return nil
-	}
-	v.style = &style
-	return v
-}
-
 // FGColor sets a foreground color to the view.
-func (v *View) FGColor(color int) *View {
+func (v *View) FGColor(color uint8) *View {
 	if v == nil {
 		return nil
 	}
 	if v.style == nil {
-		v.style = new(Style)
+		v.style = new(style)
 	}
-	v.style.F256 = color
+	v.style.f256 = color
 	return v
 }
 
 // BGColor sets a background color to the view.
-func (v *View) BGColor(color int) *View {
+func (v *View) BGColor(color uint8) *View {
 	if v == nil {
 		return nil
 	}
 	if v.style == nil {
-		v.style = new(Style)
+		v.style = new(style)
 	}
-	v.style.B256 = color
+	v.style.b256 = color
 	return v
 }
 
-func BorderOptionFGColor(color int) func(*View) {
-	return func(v *View) {
-		v.border.F256 = color
+// Bold sets bold style to the view.
+func (v *View) Bold() *View {
+	if v == nil {
+		return nil
 	}
+	if v.style == nil {
+		v.style = new(style)
+	}
+	v.style.bold = true
+	return v
 }
 
-func BorderOptionBGColor(color int) func(*View) {
-	return func(v *View) {
-		v.border.B256 = color
+// Italic sets italic style to the view.
+func (v *View) Italic() *View {
+	if v == nil {
+		return nil
 	}
+	if v.style == nil {
+		v.style = new(style)
+	}
+	v.style.italic = true
+	return v
 }
 
-type borderOption = func(*View) error
+// Underline sets underline style to the view.
+func (v *View) Underline() *View {
+	if v == nil {
+		return nil
+	}
+	if v.style == nil {
+		v.style = new(style)
+	}
+	v.style.underline = true
+	return v
+}
+
+// Strikethrough sets strikethourgh style to the view.
+func (v *View) Strikethrough() *View {
+	if v == nil {
+		return nil
+	}
+	if v.style == nil {
+		v.style = new(style)
+	}
+	v.style.strikethrough = true
+	return v
+}
+
+// Reverse sets Reverse style to the view.
+func (v *View) Reverse() *View {
+	if v == nil {
+		return nil
+	}
+	if v.style == nil {
+		v.style = new(style)
+	}
+	v.style.reverse = true
+	return v
+}
+
+func (v *View) If(condition bool, fn func(v *View) *View) *View {
+	if condition {
+		fn(v)
+	}
+	return v
+}
 
 func (v *View) Border(options ...borderOption) *View {
 	if v == nil {
@@ -142,10 +189,18 @@ func (v *View) Border(options ...borderOption) *View {
 	v.paddingLeading = 2
 	v.paddingBottom = 2
 	v.paddingTrailing = 2
-	v.border = new(Style)
+	v.border = new(style)
 	for _, option := range options {
 		option(v)
 	}
+	return v
+}
+
+func (v *View) KeyHandler(fn func(rune) any) *View {
+	if v == nil {
+		return nil
+	}
+	v.keyHandler = fn
 	return v
 }
 
@@ -157,13 +212,27 @@ func (v *View) Hidden(isHidden bool) *View {
 	}
 }
 
+func BorderOptionFGColor(color uint8) func(*View) {
+	return func(v *View) {
+		v.border.f256 = color
+	}
+}
+
+func BorderOptionBGColor(color uint8) func(*View) {
+	return func(v *View) {
+		v.border.b256 = color
+	}
+}
+
+type borderOption = func(*View)
+
 func TextView(body string) *View {
 	v := &View{}
 	v.renderer = func() []text { return []text{{Str: body, Style: *v.style}} }
 	return v
 }
 
-func Spacer(views ...*View) *View {
+func Spacer() *View {
 	return &View{}
 }
 
@@ -189,8 +258,8 @@ func String(s string) *View {
 
 func Cursor(s string) *View {
 	v := String(s)
-	v.style = new(Style)
-	v.style.HasCursor = true
+	v.style = new(style)
+	v.style.hasCursor = true
 	return v
 }
 
@@ -208,12 +277,12 @@ func InlineStack(views ...*View) *View {
 		slice := make([]text, 0)
 		for _, child := range views {
 			if child == nil {
-				return nil
+				continue
 			}
 			if child.style == nil {
-				child.style = new(Style)
+				child.style = new(style)
 			}
-			mergeDefaultStyle(child.style, *view.style)
+			child.style.merge(*view.style)
 			slice = append(slice, child.renderer()...)
 		}
 		return slice

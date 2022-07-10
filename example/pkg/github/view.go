@@ -7,234 +7,45 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/dytlzl/tervi/pkg/color"
+	"github.com/dytlzl/tervi/pkg/component"
 	"github.com/dytlzl/tervi/pkg/key"
 	"github.com/dytlzl/tervi/pkg/tui"
 )
 
 const channelSize = 64
 
-type RepoSearchView struct {
-	Result             RepositorySearchResult
-	IsSearching        bool
-	selectedRepository int
-	input              string
-	position           int
-	lastStrokeTime     time.Time
-	lastInput          string
-	ReadMeMap          map[string]string
-	ReadMeRequestMap   map[string]bool
-}
-
-func NewRepoSearchView() *RepoSearchView {
-	return &RepoSearchView{
-		Result:           RepositorySearchResult{},
-		ReadMeMap:        map[string]string{},
-		ReadMeRequestMap: map[string]bool{},
-	}
-}
-
-func (m *RepoSearchView) Body() *tui.View {
-	style := tui.Style{F256: 255, B256: 0}
-	cursorStyle := tui.Style{F256: 93, B256: style.F256, HasCursor: true}
-
-	slice := make([]*tui.View, 0, len(m.Result.Repositories)+10)
-	slice = append(slice, tui.String("Query > ").Style(tui.Style{F256: 135, B256: style.B256}))
-	if m.position == len(m.input) {
-		slice = append(slice,
-			tui.String(m.input[:m.position]),
-			tui.String(" ").Style(cursorStyle),
-		)
-	} else {
-		_, size := utf8.DecodeRuneInString(m.input[m.position:])
-		slice = append(slice,
-			tui.String(m.input[:m.position]),
-			tui.String(m.input[m.position:m.position+size]).Style(cursorStyle),
-			tui.String(m.input[m.position+size:]),
-		)
-	}
-	if m.Result.Query != "" {
-		if m.selectedRepository >= len(m.Result.Repositories) {
-			m.selectedRepository = len(m.Result.Repositories) - 1
-		}
-		if m.selectedRepository < 0 {
-			m.selectedRepository = 0
-		}
-		slice = append(slice, tui.Break(), tui.Break())
-		lastOrigin := ""
-		for i, repo := range m.Result.Repositories {
-			if repo.Origin != lastOrigin {
-				slice = append(slice, tui.String(" "+repo.Origin+":\n").Style(tui.Style{F256: 8, B256: style.B256}))
-				lastOrigin = repo.Origin
-			}
-			if i == m.selectedRepository {
-				slice = append(slice,
-					tui.String("> ").Style(tui.Style{F256: 8, B256: style.B256}),
-					tui.Fmt(" #%d", i).Style(tui.Style{F256: 8, B256: 163}),
-					tui.Fmt(" %s \n", repo.FullName).Style(tui.Style{F256: 255, B256: 163}),
-				)
-			} else {
-				slice = append(slice,
-					tui.Fmt("   #%d", i).Style(tui.Style{F256: 8, B256: style.B256}),
-					tui.Fmt(" %s \n", repo.FullName),
-				)
-			}
-		}
-	}
-	return tui.InlineStack(slice...).Style(style)
-}
-
-func (m *RepoSearchView) HandleEvent(event any) any {
-	switch typed := event.(type) {
-	case RepositorySearchResult:
-		if typed.CreatedAt.UnixMicro() > m.Result.CreatedAt.UnixMicro() {
-			m.Result = typed
-		}
-	case ReadMeResult:
-		m.ReadMeMap[typed.HtmlUrl] = typed.ReadMe
-	case rune:
-		switch typed {
-		case key.CtrlS:
-			return "code"
-		case key.CtrlL:
-			if m.selectedRepository < len(m.Result.Repositories) {
-				go OpenRepository(m.Result.Repositories[m.selectedRepository].HtmlUrl)
-			}
-		case key.CtrlV:
-			if m.selectedRepository < len(m.Result.Repositories) {
-				go OpenRepository(m.Result.Repositories[m.selectedRepository].HtmlUrl)
-			}
-		case key.Enter:
-			if m.selectedRepository < len(m.Result.Repositories) {
-				go OpenUrl(m.Result.Repositories[m.selectedRepository].HtmlUrl)
-			}
-		case key.ArrowLeft:
-			if m.position > 0 {
-				_, size := utf8.DecodeLastRuneInString(m.input[:m.position])
-				m.position -= size
-			}
-		case key.ArrowRight:
-			if m.position < len(m.input) {
-				_, size := utf8.DecodeRuneInString(m.input[m.position:])
-				m.position += size
-			}
-		case key.ArrowUp:
-			m.selectedRepository--
-		case key.ArrowDown:
-			m.selectedRepository++
-		case key.Del:
-			if m.input != "" {
-				_, size := utf8.DecodeLastRuneInString(m.input[:m.position])
-				m.input = m.input[:m.position-size] + m.input[m.position:]
-				m.position -= size
-			}
-			m.lastStrokeTime = time.Now()
-		case key.Esc:
-			return tui.Terminate
-		default:
-			m.input = m.input[:m.position] + string(typed) + m.input[m.position:]
-			m.position += utf8.RuneLen(typed)
-			m.lastStrokeTime = time.Now()
-		}
-	}
-	if m.input != m.lastInput && m.lastStrokeTime.UnixMilli()+10 < time.Now().UnixMilli() {
-		requestChannel <- RepositorySearchInput{Query: m.input, CreatedAt: time.Now()}
-		m.lastInput = m.input
-		channel <- FooterMessage{Payload: "Searching..."}
-		m.IsSearching = true
-	}
-	if m.IsSearching && m.lastInput == m.Result.Query {
-		channel <- FooterMessage{Payload: ""}
-		m.IsSearching = false
-	}
-	return nil
-}
-
-func (m *RepoSearchView) SubView() *RepoSubView {
-	if m.selectedRepository >= len(m.Result.Repositories) {
-		m.selectedRepository = len(m.Result.Repositories) - 1
-	}
-	if m.selectedRepository < 0 {
-		m.selectedRepository = 0
-	}
-	if m.selectedRepository < len(m.Result.Repositories) {
-		repo := m.Result.Repositories[m.selectedRepository]
-		if !m.ReadMeRequestMap[repo.HtmlUrl] {
-			requestChannel <- repo
-			m.ReadMeRequestMap[repo.HtmlUrl] = true
-		}
-		if repo.Description == "" && m.ReadMeMap[repo.HtmlUrl] == "" {
-			return nil
-		}
-		return &RepoSubView{repo: repo, readMe: m.ReadMeMap[repo.HtmlUrl]}
-	}
-	return nil
-}
-
-type RepoSubView struct {
-	repo   RepositoryWithOrigin
-	readMe string
-}
-
-func (m *RepoSubView) Body() *tui.View {
-	style := tui.Style{F256: 255, B256: 0}
-	keyStyle := tui.Style{F256: 135, B256: style.B256}
-	return tui.InlineStack(
-		tui.If(m.repo.Description != "",
-			tui.InlineStack(
-				tui.String("Description: \n ").Style(keyStyle),
-				tui.String(m.repo.Description+"\n\n").Style(style),
-			),
-			nil,
-		),
-		tui.If(m.readMe != "",
-			tui.InlineStack(
-				tui.String("README: \n ").Style(keyStyle),
-				tui.String(m.readMe+"\n").Style(style),
-			),
-			nil,
-		),
-	)
-}
-
-type CodeSearchView struct {
-	Result            CodeSearchResult
+type SearchView struct {
+	Type              string
+	Result            searchResult
 	IsSearching       bool
-	ContentMap        map[string]string
-	ContentRequestMap map[string]bool
 	selectedItem      int
 	input             string
 	position          int
 	lastStrokeTime    time.Time
 	lastInput         string
-	runeMode          bool
+	ContentMap        map[string]string
+	ContentRequestMap map[string]bool
 }
 
-func NewCodeSearchView() *CodeSearchView {
-	return &CodeSearchView{
+func NewRepoSearchView() *SearchView {
+	return &SearchView{
+		Type:              "repo",
 		ContentMap:        map[string]string{},
 		ContentRequestMap: map[string]bool{},
 	}
 }
 
-func (m *CodeSearchView) Body() *tui.View {
-	style := tui.Style{F256: 255, B256: 0}
-	cursorStyle := tui.Style{F256: 93, B256: style.F256, HasCursor: true}
-
-	slice := make([]*tui.View, 0, len(m.Result.Items)+10)
-	slice = append(slice, tui.String("Query > ").Style(tui.Style{F256: 135, B256: style.B256}))
-	if m.position == len(m.input) {
-		slice = append(slice,
-			tui.String(m.input[:m.position]),
-			tui.String(" ").Style(cursorStyle),
-		)
-	} else {
-		_, size := utf8.DecodeRuneInString(m.input[m.position:])
-		slice = append(slice,
-			tui.String(m.input[:m.position]),
-			tui.String(m.input[m.position:m.position+size]).Style(cursorStyle),
-			tui.String(m.input[m.position+size:]),
-		)
+func NewCodeSearchView() *SearchView {
+	return &SearchView{
+		Type:              "code",
+		ContentMap:        map[string]string{},
+		ContentRequestMap: map[string]bool{},
 	}
+}
+
+func (m *SearchView) Body() *tui.View {
+	slice := make([]*tui.View, 0, len(m.Result.Items)+10)
 	if m.Result.Query != "" {
 		if m.selectedItem >= len(m.Result.Items) {
 			m.selectedItem = len(m.Result.Items) - 1
@@ -242,104 +53,111 @@ func (m *CodeSearchView) Body() *tui.View {
 		if m.selectedItem < 0 {
 			m.selectedItem = 0
 		}
-		slice = append(slice, tui.Break(), tui.Break())
+		slice = append(slice, tui.Break())
 		lastOrigin := ""
 		width, _, _ := tui.TermSize()
 		for i, item := range m.Result.Items {
-			if item.Origin() != lastOrigin {
-				slice = append(slice, tui.String(" "+item.Origin()+":\n").Style(tui.Style{F256: 8, B256: style.B256}))
-				lastOrigin = item.Origin()
+			if item.Origin != lastOrigin {
+				slice = append(slice, tui.String(" "+item.Origin+":\n").FGColor(8))
+				lastOrigin = item.Origin
 			}
-			path := item.Path
-			if width/3-len(item.Repository.FullName)-15 < 0 {
-				path = ""
-			} else if len(path) > width/3-len(item.Repository.FullName)-15 {
-				for len(path) > width/3-len(item.Repository.FullName)-15 {
-					_, size := utf8.DecodeLastRuneInString(path)
-					path = path[:len(path)-size]
-				}
-				path += "..."
-			}
-			if i == m.selectedItem {
-				slice = append(slice,
-					tui.String("> ").Style(tui.Style{F256: 8, B256: style.B256}),
-					tui.Fmt(" #%d ", i).Style(tui.Style{F256: 8, B256: 163}),
-					tui.String(item.Repository.FullName).Style(tui.Style{F256: 225, B256: 163}),
-					tui.Fmt(" %s \n", path).Style(tui.Style{F256: 255, B256: 163}),
-				)
+			slice = append(slice, tui.Fmt("%s  #%d ", tui.If(i == m.selectedItem, ">", " "), i).FGColor(8))
+			if m.Type == "repo" {
+				repo := item.ResultItem.(Repository)
+				slice = append(slice, tui.Fmt("%s", repo.FullName).If(i == m.selectedItem, (*tui.View).Underline))
 			} else {
+				item := item.ResultItem.(CodeSearchResultItem)
+				path := item.Path
+				if width/2-len(item.Repository.FullName)-15 < 0 {
+					path = ""
+				} else if len(path) > width/2-len(item.Repository.FullName)-15 {
+					for len(path) > width/2-len(item.Repository.FullName)-15 {
+						_, size := utf8.DecodeLastRuneInString(path)
+						path = path[:len(path)-size]
+					}
+					path += "..."
+				}
 				slice = append(slice,
-					tui.Fmt("   #%d ", i).Style(tui.Style{F256: 8, B256: style.B256}),
-					tui.String(item.Repository.FullName).Style(tui.Style{F256: 225, B256: style.B256}),
-					tui.Fmt(" %s \n", path),
+					tui.String(item.Repository.FullName).FGColor(225).If(i == m.selectedItem, (*tui.View).Underline),
+					tui.Fmt(" %s", path).If(i == m.selectedItem, (*tui.View).Underline),
 				)
 			}
+			slice = append(slice, tui.Break())
 		}
 	}
-	return tui.InlineStack(slice...).Style(style)
+	var title string
+	if m.Type == "repo" {
+		title = "Repository Search"
+	} else {
+		title = "Code Search"
+	}
+	if m.Result.Query != "" {
+		title = fmt.Sprintf("Result of '%s' - %s", m.Result.Query, title)
+	}
+	return tui.VStack(
+		tui.HStack(
+			tui.String("Query > ").FGColor(color.RGB(200, 0, 200)).AbsoluteSize(8, 1),
+			component.TextInput(&m.input, &m.position, func() {
+				m.lastStrokeTime = time.Now()
+			}),
+		).AbsoluteSize(0, 1),
+		tui.InlineStack(slice...),
+	).Title(title)
 }
 
-func (m *CodeSearchView) HandleEvent(event any) any {
+func (m *SearchView) HandleEvent(event any) any {
 	switch typed := event.(type) {
-	case CodeSearchResult:
+	case searchResult:
 		if typed.CreatedAt.UnixMicro() > m.Result.CreatedAt.UnixMicro() {
 			m.Result = typed
 		}
+	case ReadMeResult:
+		m.ContentMap[typed.HtmlUrl] = typed.ReadMe
 	case ContentResult:
 		m.ContentMap[typed.Url] = typed.Content
 	case rune:
 		switch typed {
 		case key.CtrlS:
-			return "repo"
+			if m.Type == "repo" {
+				return "code"
+			} else {
+				return "repo"
+			}
+		case key.CtrlL:
+			if m.Type == "repo" {
+				if m.selectedItem < len(m.Result.Items) {
+					go OpenRepository(m.Result.Items[m.selectedItem].ResultItem.(Repository).HtmlUrl)
+				}
+			}
 		case key.Enter:
 			if m.selectedItem < len(m.Result.Items) {
-				go OpenUrl(m.Result.Items[m.selectedItem].HtmlUrl)
-			}
-		case key.CtrlR:
-			m.runeMode = !m.runeMode
-		case key.ArrowLeft:
-			if m.position > 0 {
-				_, size := utf8.DecodeLastRuneInString(m.input[:m.position])
-				m.position -= size
-			}
-		case key.ArrowRight:
-			if m.position < len(m.input) {
-				_, size := utf8.DecodeRuneInString(m.input[m.position:])
-				m.position += size
+				if m.Type == "repo" {
+					go OpenUrl(m.Result.Items[m.selectedItem].ResultItem.(Repository).HtmlUrl)
+				} else {
+					go OpenUrl(m.Result.Items[m.selectedItem].ResultItem.(CodeSearchResultItem).HtmlUrl)
+
+				}
 			}
 		case key.ArrowUp:
 			m.selectedItem--
 		case key.ArrowDown:
 			m.selectedItem++
-		case key.Del:
-			if m.input != "" {
-				_, size := utf8.DecodeLastRuneInString(m.input[:m.position])
-				m.input = m.input[:m.position-size] + m.input[m.position:]
-				m.position -= size
-			}
-			m.lastStrokeTime = time.Now()
 		case key.Esc:
-			return tui.Terminate
-		default:
-			m.input = m.input[:m.position] + string(typed) + m.input[m.position:]
-			m.position += utf8.RuneLen(typed)
-			m.lastStrokeTime = time.Now()
+			isQuitMenuOpen = true
 		}
 	}
 	if m.input != m.lastInput && m.lastStrokeTime.UnixMilli()+50 < time.Now().UnixMilli() {
-		requestChannel <- CodeSearchInput{Query: m.input, CreatedAt: time.Now()}
+		requestChannel <- SearchInput{Type: m.Type, Query: m.input, CreatedAt: time.Now()}
 		m.lastInput = m.input
-		channel <- FooterMessage{Payload: "Searching..."}
 		m.IsSearching = true
 	}
 	if m.IsSearching && m.lastInput == m.Result.Query {
-		channel <- FooterMessage{Payload: ""}
 		m.IsSearching = false
 	}
 	return nil
 }
 
-func (m *CodeSearchView) SubView() *CodeSubView {
+func (m *SearchView) SubView() *tui.View {
 	if m.selectedItem >= len(m.Result.Items) {
 		m.selectedItem = len(m.Result.Items) - 1
 	}
@@ -347,72 +165,92 @@ func (m *CodeSearchView) SubView() *CodeSubView {
 		m.selectedItem = 0
 	}
 	if m.selectedItem < len(m.Result.Items) {
-		item := m.Result.Items[m.selectedItem]
-		if !m.ContentRequestMap[item.Url] {
-			requestChannel <- item
-			m.ContentRequestMap[item.Url] = true
+		if m.Type == "repo" {
+			repo := m.Result.Items[m.selectedItem].ResultItem.(Repository)
+			if !m.ContentRequestMap[repo.HtmlUrl] {
+				requestChannel <- m.Result.Items[m.selectedItem]
+				m.ContentRequestMap[repo.HtmlUrl] = true
+			}
+			if repo.Description == "" && m.ContentMap[repo.HtmlUrl] == "" {
+				return nil
+			}
+			return tui.InlineStack(
+				tui.If(repo.Description != "",
+					tui.InlineStack(
+						tui.String("Description: \n ").FGColor(8),
+						tui.String(repo.Description+"\n\n"),
+					),
+					nil,
+				),
+				tui.If(m.ContentMap[repo.HtmlUrl] != "",
+					tui.InlineStack(
+						tui.String("README: \n ").FGColor(8),
+						tui.String(m.ContentMap[repo.HtmlUrl]+"\n"),
+					),
+					nil,
+				),
+			).Title(repo.FullName)
+		} else {
+			item := m.Result.Items[m.selectedItem].ResultItem.(CodeSearchResultItem)
+			if !m.ContentRequestMap[item.Url] {
+				requestChannel <- m.Result.Items[m.selectedItem]
+				m.ContentRequestMap[item.Url] = true
+			}
+			if m.ContentMap[item.Url] == "" {
+				return tui.String("Loading...").FGColor(8)
+			}
+			content := strings.ReplaceAll(m.ContentMap[item.Url], string(rune(9)), "    ")
+			lines := strings.Split(content, "\n")
+			col := -1
+			row := -1
+			for number, line := range lines {
+				index := strings.Index(strings.ToUpper(line), strings.ToUpper(m.Result.Query))
+				if index != -1 {
+					col = index
+					row = number
+					break
+				}
+			}
+			if col == -1 {
+				row = 0
+			}
+			_, height, _ := tui.TermSize()
+			beginRow := row - height/2
+			endRow := row + height/2
+			if beginRow < 0 {
+				endRow -= beginRow
+				beginRow = 0
+			}
+			if endRow > len(lines)-1 {
+				beginRow -= endRow - (len(lines) - 1)
+				if beginRow < 0 {
+					beginRow = 0
+				}
+				endRow = len(lines) - 1
+			}
+			lineNumberWidth := len(strconv.Itoa(endRow + 1))
+			return tui.InlineMapN(endRow-beginRow+1, func(i int) *tui.View {
+				rowNumber := beginRow + i
+				return tui.InlineStack(
+					tui.Fmt(fmt.Sprintf("%%%dd ", lineNumberWidth), rowNumber+1).FGColor(135),
+					codeLineView(lines[rowNumber], m.Result.Query),
+					tui.Break(),
+				)
+			}).Title(item.Path)
 		}
-		return &CodeSubView{item: item, content: m.ContentMap[item.Url], query: m.Result.Query}
 	}
 	return nil
 }
 
-type CodeSubView struct {
-	content string
-	query   string
-	item    SearchResultItem
-}
-
-func (m *CodeSubView) Body() *tui.View {
-	if m.content == "" {
-		return tui.String("Loading...").Style(tui.Style{F256: 135, B256: 0})
-	}
-	content := strings.ReplaceAll(m.content, string(rune(9)), "    ")
-	lines := strings.Split(content, "\n")
-	col := -1
-	row := -1
-	for number, line := range lines {
-		index := strings.Index(line, m.query)
-		if index != -1 {
-			col = index
-			row = number
-			break
-		}
-	}
-	if col == -1 {
-		row = 0
-	}
-	_, height, _ := tui.TermSize()
-	beginRow := row - height/2
-	endRow := row + height/2
-	if beginRow < 0 {
-		endRow -= beginRow
-		beginRow = 0
-	}
-	if endRow > len(lines)-1 {
-		beginRow -= endRow - (len(lines) - 1)
-		if beginRow < 0 {
-			beginRow = 0
-		}
-		endRow = len(lines) - 1
-	}
-	lineNumberWidth := len(strconv.Itoa(endRow + 1))
-	return tui.InlineMapN(endRow-beginRow+1, func(i int) *tui.View {
-		rowNumber := beginRow + i
-		index := strings.Index(lines[rowNumber], m.query)
-		if index == -1 {
-			return tui.InlineStack(
-				tui.Fmt(fmt.Sprintf("%%%dd ", lineNumberWidth), rowNumber+1).Style(tui.Style{F256: 135, B256: 0}),
-				tui.String(lines[rowNumber]+"\n"),
-			)
-		}
+func codeLineView(line, pattern string) *tui.View {
+	index := strings.Index(strings.ToUpper(line), strings.ToUpper(pattern))
+	if index == -1 {
+		return tui.String(line)
+	} else {
 		return tui.InlineStack(
-			tui.Fmt(fmt.Sprintf("%%%dd ", lineNumberWidth), rowNumber+1).Style(tui.Style{F256: 135, B256: 0}),
-			tui.InlineStack(
-				tui.String(lines[rowNumber][:index]),
-				tui.String(lines[rowNumber][index:index+len(m.query)]).BGColor(163),
-				tui.String(lines[rowNumber][index+len(m.query):]+"\n"),
-			),
+			tui.String(line[:index]),
+			tui.String(line[index:index+len(pattern)]).BGColor(135),
+			tui.String(line[index+len(pattern):]),
 		)
-	})
+	}
 }

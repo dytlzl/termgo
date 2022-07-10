@@ -10,23 +10,15 @@ import (
 type cell struct {
 	Char  rune
 	Width int
-	Style Style
+	Style style
 }
 
 type text struct {
 	Str   string
-	Style Style
+	Style style
 }
 
-type Style struct {
-	Foreground int
-	Background int
-	F256       int
-	B256       int
-	HasCursor  bool
-}
-
-func TermSize() (int, int, error) {
+func TermSize() (width int, height int, err error) {
 	return term.GetSize(int(os.Stdin.Fd()))
 }
 
@@ -50,10 +42,10 @@ func (r *renderer) updateTerminalSize() (bool, error) {
 	return hasChanged, nil
 }
 
-func (r *renderer) fill(style Style) {
+func (r *renderer) fill(s style) {
 	for y := 0; y < r.height; y++ {
 		for x := 0; x < r.width; x++ {
-			r.rows[y][x] = cell{' ', 1, style}
+			r.rows[y][x] = cell{' ', 1, s}
 		}
 	}
 }
@@ -71,32 +63,42 @@ func (r *renderer) draw() {
 		csi(fmt.Sprintf("%dA", r.cursorY-1))
 		push("\r")
 	}
-	lastStyle := Style{}
+	lastStyle := style{}
 	for y := 0; y < r.height; y++ {
 		if y != 0 {
 			csi("1B")
 			push("\r")
 		}
 		for x := 0; x < r.width; x++ {
-			style := r.rows[y][x].Style
-			if lastStyle.Foreground != style.Foreground ||
-				lastStyle.Background != style.Background ||
-				lastStyle.F256 != style.F256 ||
-				lastStyle.B256 != style.B256 {
+			s := r.rows[y][x].Style
+			if s != lastStyle {
 				push("\033[1;0m")
-				if style.F256 != 0 {
-					push(fmt.Sprintf("\033[38;5;%dm", style.F256))
-				} else if style.Foreground != 0 {
-					push(fmt.Sprintf("\033[1;%dm", style.Foreground))
+				if s.f256 != 0 {
+					push(fmt.Sprintf("\033[38;5;%dm", s.f256))
 				}
-				if style.B256 != 0 {
-					push(fmt.Sprintf("\033[48;5;%dm", style.B256))
-				} else if style.Background != 0 {
-					push(fmt.Sprintf("\033[1;%dm", style.Background))
+				if s.b256 != 0 {
+					push(fmt.Sprintf("\033[48;5;%dm", s.b256))
 				}
-				lastStyle = style
+				if s.bold {
+					push("\033[1m")
+				}
+				if s.italic {
+					push("\033[3m")
+				}
+				if s.underline {
+					push("\033[4m")
+				}
+				if s.reverse {
+					push("\033[7m")
+				}
+				if s.strikethrough {
+					push("\033[9m")
+				}
+
+				lastStyle = s
 			}
-			if style.HasCursor {
+
+			if s.hasCursor {
 				r.cursorY = y
 				r.cursorX = x
 			}

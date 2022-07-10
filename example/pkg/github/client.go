@@ -74,9 +74,9 @@ func (g GithubClient) RequestWithEndpoint(ctx context.Context, method string, en
 	return g.Request(ctx, method, g.apiAddress+endpoint, paramMap)
 }
 
-type SearchResult struct {
-	TotalCount int                `json:"total_count"`
-	Items      []SearchResultItem `json:"items"`
+type CodeSearchResult struct {
+	TotalCount int                    `json:"total_count"`
+	Items      []CodeSearchResultItem `json:"items"`
 }
 
 type RepositoryItemsSearchResult struct {
@@ -105,18 +105,18 @@ type Event struct {
 	RequestedReviewer User   `json:"requested_reviewer"`
 }
 
-type SearchResultItem struct {
+type CodeSearchResultItem struct {
 	Url        string     `json:"url"`
 	Path       string     `json:"path"`
 	HtmlUrl    string     `json:"html_url"`
 	Repository Repository `json:"repository"`
 }
 
-func (i SearchResultItem) Origin() string {
+func (i CodeSearchResultItem) Origin() string {
 	return strings.Split(i.Url, "/")[2]
 }
 
-func (g *GithubClient) FetchSearchResultContents(ctx context.Context, item SearchResultItem) (string, error) {
+func (g *GithubClient) FetchSearchResultContents(ctx context.Context, item CodeSearchResultItem) (string, error) {
 	res, err := g.Request(ctx, "GET", item.Url, nil)
 	if err != nil {
 		return "", err
@@ -152,18 +152,18 @@ func (g *GithubClient) FetchReadMe(ctx context.Context, fullName string) (string
 	return string(bytes), nil
 }
 
-func (g *GithubClient) Search(ctx context.Context, query string, page int, per_page int) (SearchResult, error) {
+func (g *GithubClient) Search(ctx context.Context, query string, page int, per_page int) (CodeSearchResult, error) {
 	res, err := g.RequestWithEndpoint(ctx, "GET", "/search/code", map[string]any{
 		"q":        query,
 		"per_page": per_page,
 		"page":     page,
 	})
 	if err != nil {
-		return SearchResult{}, err
+		return CodeSearchResult{}, err
 	}
-	var jsonMap SearchResult
+	var jsonMap CodeSearchResult
 	if err := json.Unmarshal(res, &jsonMap); err != nil {
-		return SearchResult{}, fmt.Errorf("failed to unmarshal json: %w: %s", err, string(res))
+		return CodeSearchResult{}, fmt.Errorf("failed to unmarshal json: %w: %s", err, string(res))
 	}
 	return jsonMap, nil
 }

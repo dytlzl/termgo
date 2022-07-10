@@ -25,10 +25,10 @@ func newViewRenderer(r *renderer, x, y, width, height, paddingTop, paddingLeadin
 	return &viewRenderer{r, x, y, width, height, paddingTop, paddingLeading, paddingBottom, paddingTrailing}, nil
 }
 
-func (w *viewRenderer) putBody(slice []text, defaultStyle Style) {
+func (w *viewRenderer) putBody(slice []text, defaultStyle style) {
 	x, y := 0, 0
 	for _, as := range slice {
-		mergeDefaultStyle(&as.Style, defaultStyle)
+		as.Style.merge(defaultStyle)
 		for _, r := range as.Str {
 			if r == 13 { // CR
 				continue
@@ -48,10 +48,10 @@ func (w *viewRenderer) putBody(slice []text, defaultStyle Style) {
 			}
 			w.put(cell{Char: r, Width: width, Style: as.Style}, x, y)
 			if width == 2 {
-				if as.Style.HasCursor {
-					style := as.Style
-					style.HasCursor = false
-					w.put(cell{Char: ' ', Width: 0, Style: style}, x+1, y)
+				if as.Style.hasCursor {
+					s := as.Style
+					s.hasCursor = false
+					w.put(cell{Char: ' ', Width: 0, Style: s}, x+1, y)
 				} else {
 					w.put(cell{Char: ' ', Width: 0, Style: as.Style}, x+1, y)
 				}
@@ -61,21 +61,21 @@ func (w *viewRenderer) putBody(slice []text, defaultStyle Style) {
 	}
 }
 
-func (w *viewRenderer) putBorder(style Style) {
+func (w *viewRenderer) putBorder(s style) {
 	for x := 1; x < w.width-1; x++ {
-		c := cell{Char: '─', Width: 1, Style: style}
+		c := cell{Char: '─', Width: 1, Style: s}
 		w.renderer.rows[w.y][w.x+x] = c
 		w.renderer.rows[w.y+w.height-1][w.x+x] = c
 	}
 	for y := 1; y < w.height-1; y++ {
-		c := cell{Char: '│', Width: 1, Style: style}
+		c := cell{Char: '│', Width: 1, Style: s}
 		w.renderer.rows[w.y+y][w.x] = c
 		w.renderer.rows[w.y+y][w.x+w.width-1] = c
 	}
-	w.renderer.rows[w.y][w.x] = cell{Char: '╭', Width: 1, Style: style}
-	w.renderer.rows[w.y][w.x+w.width-1] = cell{Char: '╮', Width: 1, Style: style}
-	w.renderer.rows[w.y+w.height-1][w.x] = cell{Char: '╰', Width: 1, Style: style}
-	w.renderer.rows[w.y+w.height-1][w.x+w.width-1] = cell{Char: '╯', Width: 1, Style: style}
+	w.renderer.rows[w.y][w.x] = cell{Char: '╭', Width: 1, Style: s}
+	w.renderer.rows[w.y][w.x+w.width-1] = cell{Char: '╮', Width: 1, Style: s}
+	w.renderer.rows[w.y+w.height-1][w.x] = cell{Char: '╰', Width: 1, Style: s}
+	w.renderer.rows[w.y+w.height-1][w.x+w.width-1] = cell{Char: '╯', Width: 1, Style: s}
 }
 
 func (w *viewRenderer) putTitle(slice []text) {

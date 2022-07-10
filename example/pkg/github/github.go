@@ -35,24 +35,15 @@ func SetAPIs(apis []API) {
 	}
 }
 
-type CodeSearchInput struct {
+type SearchInput struct {
+	Type      string
 	Query     string
 	CreatedAt time.Time
 }
 
-type RepositorySearchInput struct {
-	Query     string
-	CreatedAt time.Time
-}
-
-type RepositorySearchResult struct {
-	RepositorySearchInput
-	Repositories []RepositoryWithOrigin
-}
-
-type CodeSearchResult struct {
-	CodeSearchInput
-	Items []SearchResultItem
+type searchResult struct {
+	SearchInput
+	Items []ResultItemWithOrigin
 }
 
 type ContentResult struct {
@@ -65,8 +56,8 @@ type ReadMeResult struct {
 	ReadMe  string
 }
 
-type RepositoryWithOrigin struct {
-	Repository
+type ResultItemWithOrigin struct {
+	ResultItem any
 	Origin string
 }
 
@@ -131,23 +122,25 @@ func SendToChan(data any, err error) {
 	channel <- data
 }
 
-func SearchCode(ctx context.Context, input CodeSearchInput) (CodeSearchResult, error) {
-	items := make([]SearchResultItem, 0, 10)
+func SearchCode(ctx context.Context, input SearchInput) (searchResult, error) {
+	items := make([]ResultItemWithOrigin, 0, 10)
 	for _, client := range Clients {
 		result, err := client.Search(ctx, input.Query, 1, 10)
 		if err != nil {
-			return CodeSearchResult{}, err
+			return searchResult{}, err
 		}
-		items = append(items, result.Items...)
+		for _, v := range result.Items {
+			items = append(items, ResultItemWithOrigin{v, client.Origin})
+		}
 	}
-	return CodeSearchResult{
-		CodeSearchInput: input,
-		Items:           items,
+	return searchResult{
+		SearchInput: input,
+		Items:       items,
 	}, nil
 }
 
-func FetchContent(ctx context.Context, item SearchResultItem) (ContentResult, error) {
-	client := clientMap[item.Origin()]
+func FetchContent(ctx context.Context, origin string, item CodeSearchResultItem) (ContentResult, error) {
+	client := clientMap[origin]
 	result, err := client.FetchSearchResultContents(ctx, item)
 	if err != nil {
 		return ContentResult{}, err
@@ -158,25 +151,25 @@ func FetchContent(ctx context.Context, item SearchResultItem) (ContentResult, er
 	}, nil
 }
 
-func SearchRepositories(ctx context.Context, input RepositorySearchInput) (RepositorySearchResult, error) {
-	repositories := make([]RepositoryWithOrigin, 0, 20)
+func SearchRepositories(ctx context.Context, input SearchInput) (searchResult, error) {
+	repositories := make([]ResultItemWithOrigin, 0, 20)
 	for _, client := range Clients {
 		res, err := client.SearchRepositories(ctx, input.Query, 1, 10)
 		if err != nil {
-			return RepositorySearchResult{}, nil
+			return searchResult{}, nil
 		}
 		for _, v := range res.Items {
-			repositories = append(repositories, RepositoryWithOrigin{v, client.Origin})
+			repositories = append(repositories, ResultItemWithOrigin{v, client.Origin})
 		}
 	}
-	return RepositorySearchResult{
-		RepositorySearchInput: input,
-		Repositories:          repositories,
+	return searchResult{
+		SearchInput: input,
+		Items:       repositories,
 	}, nil
 }
 
-func FetchReadMe(ctx context.Context, repo RepositoryWithOrigin) (ReadMeResult, error) {
-	client := clientMap[repo.Origin]
+func FetchReadMe(ctx context.Context, origin string, repo Repository) (ReadMeResult, error) {
+	client := clientMap[origin]
 	result, err := client.FetchReadMe(ctx, repo.FullName)
 	if err != nil {
 		return ReadMeResult{}, nil

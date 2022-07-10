@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/dytlzl/tervi/pkg/color"
+	"github.com/dytlzl/tervi/pkg/component"
 	"github.com/dytlzl/tervi/pkg/tui"
 )
 
@@ -18,14 +20,20 @@ func Run(ctx context.Context) error {
 			go func() {
 				SendToChan(func() (any, error) {
 					switch typed := item.(type) {
-					case RepositorySearchInput:
-						return SearchRepositories(ctx, typed)
-					case RepositoryWithOrigin:
-						return FetchReadMe(ctx, typed)
-					case CodeSearchInput:
-						return SearchCode(ctx, typed)
-					case SearchResultItem:
-						return FetchContent(ctx, typed)
+					case SearchInput:
+						switch typed.Type {
+						case "repo":
+							return SearchRepositories(ctx, typed)
+						case "code":
+							return SearchCode(ctx, typed)
+						}
+					case ResultItemWithOrigin:
+						switch typedResultItem := typed.ResultItem.(type) {
+						case Repository:
+							return FetchReadMe(ctx, typed.Origin, typedResultItem)
+						case CodeSearchResultItem:
+							return FetchContent(ctx, typed.Origin, typedResultItem)
+						}
 					}
 					return nil, nil
 				}())
@@ -58,48 +66,44 @@ func Run(ctx context.Context) error {
 		return value
 	}
 
+	isConfirmedTermination := false
+
 	err := tui.Run(
 		func() *tui.View {
 			title := ""
-			body := func() *tui.View { return nil }
-			subViewTitle := ""
-			subViewBody := func() *tui.View { return nil }
+			view := repoView
 			if mode == "repo" {
 				title = "Repository Search"
 				if repoView.Result.Query != "" {
 					title = fmt.Sprintf("Result of '%s' - %s", repoView.Result.Query, title)
 				}
-				body = repoView.Body
-				subView := repoView.SubView()
-				if subView != nil {
-					subViewTitle = subView.repo.FullName
-					subViewBody = subView.Body
-				}
+				view = repoView
 			} else {
-				body = codeView.Body
-				subView := codeView.SubView()
 				title = "Code Search"
 				if codeView.Result.Query != "" {
 					title = fmt.Sprintf("Result of '%s' - %s", codeView.Result.Query, title)
 				}
-				if subView != nil {
-					subViewTitle = subView.item.Path
-					subViewBody = subView.Body
-				}
+				view = codeView
 			}
 			return tui.VStack(
 				tui.ZStack(
-					body().Title(title).Border(),
+					view.Body().Title(title).Border(tui.BorderOptionFGColor(color.RGB(100, 100, 100))),
 					tui.HStack(
 						tui.Spacer(),
-						subViewBody().Title(subViewTitle).Border().Hidden(subViewTitle == ""),
-					).Padding(2, 2, 2, 2),
+						view.SubView().Border(tui.BorderOptionFGColor(color.RGB(100, 100, 100))),
+					).Padding(2),
+					tui.If(view.IsSearching,
+						tui.ZStack(
+							tui.String("Searching...").AbsoluteSize(12, 1),
+						).Border(tui.BorderOptionFGColor(color.RGB(100, 100, 100))).AbsoluteSize(20, 5),
+						nil,
+					),
+					component.QuitView(&isQuitMenuOpen, &isConfirmedTermination).FGColor(color.RGB(200, 200, 200)).BGColor(color.RGB(100, 0, 100)),
 				),
-				tui.TextView(footerMessage).AbsoluteSize(0, 1).Style(tui.Style{F256: 15, B256: 135}).Padding(0, 1, 0, 1),
+				tui.TextView(footerMessage).AbsoluteSize(0, 1).BGColor(color.RGB(100, 0, 100)).Padding(0, 1),
 			)
 		},
 		tui.OptionEventHandler(handleEvent),
-		tui.OptionStyle(tui.Style{F256: 255, B256: 0}),
 		tui.OptionChannel(channel),
 	)
 	if err != nil {
@@ -111,6 +115,8 @@ func Run(ctx context.Context) error {
 	}
 	return nil
 }
+
+var isQuitMenuOpen = false
 
 var channel = make(chan any, 100)
 
