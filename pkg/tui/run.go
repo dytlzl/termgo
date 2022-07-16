@@ -41,7 +41,7 @@ func Print(createView func() *View, options ...option) error {
 	v := ZStack(createView())
 
 	// Render views
-	err = renderView(r, v, &cfg, rect{0, 0, r.width, r.height}, rect{0, 0, r.width, r.height}, style{})
+	err = computeView(r, v, &cfg, rect{0, 0, r.width, r.height}, rect{0, 0, r.width, r.height}, style{})
 	if err != nil {
 		return fmt.Errorf("failed to render view: %w", err)
 	}
@@ -69,8 +69,8 @@ func Run(createView func() *View, options ...option) error {
 	}
 	defer func() {
 		r.close(isAlternative)
-		for _, obj := range bufferForDebug {
-			fmt.Printf("%#v\n", obj)
+		for _, line := range bufferForDebug {
+			fmt.Println(line)
 		}
 	}()
 	var shouldTerminate = false
@@ -171,10 +171,11 @@ func Run(createView func() *View, options ...option) error {
 		// Clear
 		r.fill(style{})
 
-		v := ZStack(createView())
+		v := ZStack(createView()).AbsoluteSize(r.width, r.height)
 		cfg.focusedView = nil
+
 		// Render views
-		err = renderView(r, v, &cfg, rect{0, 0, r.width, r.height}, rect{0, 0, r.width, r.height}, style{})
+		err = computeView(r, v, &cfg, rect{0, 0, r.width, r.height}, rect{0, 0, r.width, r.height}, style{})
 		if err != nil {
 			return fmt.Errorf("failed to render view: %w", err)
 		}
@@ -189,11 +190,11 @@ type terminate struct{}
 
 var Terminate = terminate{}
 
-func renderView(r *renderer, v *View, cfg *config, frame rect, parentRect rect, defaultStyle style) error {
+func computeView(r *renderer, v *View, cfg *config, frame rect, parentFrame rect, defaultStyle style) error {
 	vr, err := newViewRenderer(
 		r,
-		frame.x, frame.y,
-		frame.width, frame.height,
+		frame,
+		parentFrame,
 		int(v.paddingTop), int(v.paddingLeading), int(v.paddingBottom), int(v.paddingTrailing),
 		true,
 	)
@@ -298,7 +299,11 @@ func renderView(r *renderer, v *View, cfg *config, frame rect, parentRect rect, 
 			y = accumulatedY
 		}
 
-		err = renderView(r, child, cfg,
+		if y+int(v.paddingBottom) >= frame.y+frame.height {
+			break
+		}
+
+		err = computeView(r, child, cfg,
 			rect{
 				x,
 				y,
@@ -306,10 +311,10 @@ func renderView(r *renderer, v *View, cfg *config, frame rect, parentRect rect, 
 				child.absoluteHeight,
 			},
 			rect{
-				frame.x,
-				frame.y,
-				v.absoluteWidth,
-				v.absoluteHeight,
+				frame.x + int(v.paddingLeading),
+				frame.y + int(v.paddingTop),
+				v.absoluteWidth - int(v.paddingLeading) - int(v.paddingTrailing),
+				v.absoluteHeight - int(v.paddingTop) - int(v.paddingBottom),
 			},
 			*v.style)
 		if err != nil {
@@ -332,8 +337,8 @@ type rect struct {
 	height int
 }
 
-var bufferForDebug = make([]any, 0)
+var bufferForDebug = make([]string, 0)
 
-func pushDebugData(data any) {
-	bufferForDebug = append(bufferForDebug, data)
+func debugf(format string, a ...any) {
+	bufferForDebug = append(bufferForDebug, fmt.Sprintf(format, a...))
 }

@@ -8,25 +8,22 @@ import (
 
 type viewRenderer struct {
 	renderer        *renderer
-	x               int
-	y               int
-	width           int
-	height          int
+	frame           rect
+	parentFrame     rect
 	paddingTop      int
 	paddingLeading  int
 	paddingBottom   int
 	paddingTrailing int
 }
 
-func newViewRenderer(r *renderer, x, y, width, height, paddingTop, paddingLeading, paddingBottom, paddingTrailing int, allowOverflow bool) (*viewRenderer, error) {
-	if !allowOverflow && (x+width > r.width || y+height > r.height) {
+func newViewRenderer(r *renderer, frame rect, parentFrame rect, paddingTop, paddingLeading, paddingBottom, paddingTrailing int, allowOverflow bool) (*viewRenderer, error) {
+	if !allowOverflow && (frame.x+frame.width > r.width || frame.y+frame.height > r.height) {
 		return nil, errors.New("terminal size is too small")
 	}
-	return &viewRenderer{r, x, y, width, height, paddingTop, paddingLeading, paddingBottom, paddingTrailing}, nil
+	return &viewRenderer{r, frame, parentFrame, paddingTop, paddingLeading, paddingBottom, paddingTrailing}, nil
 }
 
 func (w *viewRenderer) putBody(slice []text, defaultStyle style) {
-	bufferForDebug = append(bufferForDebug,[]int{w.y, w.paddingTop, w.paddingBottom, w.height, w.renderer.height})
 	x, y := 0, 0
 	for _, as := range slice {
 		as.Style.merge(defaultStyle)
@@ -40,11 +37,15 @@ func (w *viewRenderer) putBody(slice []text, defaultStyle style) {
 				continue
 			}
 			width := runewidth.RuneWidth(r)
-			if x+width > w.width-w.paddingLeading-w.paddingTrailing {
+			if x+width > w.frame.width-w.paddingLeading-w.paddingTrailing {
 				y++
+				// debugf("%d %d %d %d %d %d", w.frame.y, w.paddingTop, y, w.paddingBottom, w.parentFrame.y, w.parentFrame.height)
 				x = 0
 			}
-			if w.paddingTop+y+w.paddingBottom >= w.height {
+			if w.paddingTop+y+w.paddingBottom >= w.frame.height {
+				return
+			}
+			if w.frame.y+w.paddingTop+y-1+w.paddingBottom >= w.parentFrame.y+w.parentFrame.height {
 				return
 			}
 			w.put(cell{Char: r, Width: width, Style: as.Style}, x, y)
@@ -63,20 +64,29 @@ func (w *viewRenderer) putBody(slice []text, defaultStyle style) {
 }
 
 func (w *viewRenderer) putBorder(s style) {
-	for x := 1; x < w.width-1; x++ {
+	w.renderer.rows[w.frame.y][w.frame.x] = cell{Char: '╭', Width: 1, Style: s}
+	for x := 1; x < w.frame.width-1; x++ {
 		c := cell{Char: '─', Width: 1, Style: s}
-		w.renderer.rows[w.y][w.x+x] = c
-		w.renderer.rows[w.y+w.height-1][w.x+x] = c
+		w.renderer.rows[w.frame.y][w.frame.x+x] = c
 	}
-	for y := 1; y < w.height-1; y++ {
+	w.renderer.rows[w.frame.y][w.frame.x+w.frame.width-1] = cell{Char: '╮', Width: 1, Style: s}
+	for y := 1; y < w.frame.height-1; y++ {
+		if w.frame.y+w.paddingTop+y-2+w.paddingBottom >= w.parentFrame.y+w.parentFrame.height {
+			return
+		}
 		c := cell{Char: '│', Width: 1, Style: s}
-		w.renderer.rows[w.y+y][w.x] = c
-		w.renderer.rows[w.y+y][w.x+w.width-1] = c
+		w.renderer.rows[w.frame.y+y][w.frame.x] = c
+		w.renderer.rows[w.frame.y+y][w.frame.x+w.frame.width-1] = c
 	}
-	w.renderer.rows[w.y][w.x] = cell{Char: '╭', Width: 1, Style: s}
-	w.renderer.rows[w.y][w.x+w.width-1] = cell{Char: '╮', Width: 1, Style: s}
-	w.renderer.rows[w.y+w.height-1][w.x] = cell{Char: '╰', Width: 1, Style: s}
-	w.renderer.rows[w.y+w.height-1][w.x+w.width-1] = cell{Char: '╯', Width: 1, Style: s}
+	if w.frame.y+w.paddingTop+w.frame.height-3+w.paddingBottom >= w.parentFrame.y+w.parentFrame.height {
+		return
+	}
+	w.renderer.rows[w.frame.y+w.frame.height-1][w.frame.x] = cell{Char: '╰', Width: 1, Style: s}
+	for x := 1; x < w.frame.width-1; x++ {
+		c := cell{Char: '─', Width: 1, Style: s}
+		w.renderer.rows[w.frame.y+w.frame.height-1][w.frame.x+x] = c
+	}
+	w.renderer.rows[w.frame.y+w.frame.height-1][w.frame.x+w.frame.width-1] = cell{Char: '╯', Width: 1, Style: s}
 }
 
 func (w *viewRenderer) putTitle(slice []text) {
@@ -87,7 +97,7 @@ func (w *viewRenderer) putTitle(slice []text) {
 				return
 			}
 			width := RuneWidth(r)
-			if x+width > w.width-w.paddingLeading-w.paddingTrailing {
+			if x+width > w.frame.width-w.paddingLeading-w.paddingTrailing {
 				return
 			}
 			w.put(cell{Char: r, Width: width, Style: as.Style}, x, -w.paddingTop)
@@ -100,19 +110,22 @@ func (w *viewRenderer) putTitle(slice []text) {
 }
 
 func (w *viewRenderer) fill(c cell) {
-	for y := 0; y < w.height; y++ {
-		for x := 0; x < w.width; x++ {
-			if w.x+x > 0 && w.renderer.rows[w.y+y][w.x+x-1].Width == 2 {
-				w.renderer.rows[w.y+y][w.x+x-1] =
-					cell{' ', 1, w.renderer.rows[w.y+y][w.x+x-1].Style}
+	for y := 0; y < w.frame.height; y++ {
+		if w.frame.y+y >= w.parentFrame.y+w.parentFrame.height {
+			return
+		}
+		for x := 0; x < w.frame.width; x++ {
+			if w.frame.x+x > 0 && w.renderer.rows[w.frame.y+y][w.frame.x+x-1].Width == 2 {
+				w.renderer.rows[w.frame.y+y][w.frame.x+x-1] =
+					cell{' ', 1, w.renderer.rows[w.frame.y+y][w.frame.x+x-1].Style}
 			}
-			w.renderer.rows[w.y+y][w.x+x] = c
+			w.renderer.rows[w.frame.y+y][w.frame.x+x] = c
 		}
 	}
 }
 
 func (w *viewRenderer) put(c cell, x, y int) {
-	w.renderer.put(c, w.x+x+w.paddingLeading, w.y+y+w.paddingTop)
+	w.renderer.put(c, w.frame.x+x+w.paddingLeading, w.frame.y+y+w.paddingTop)
 }
 
 func RuneWidth(r rune) int {
