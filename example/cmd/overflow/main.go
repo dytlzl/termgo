@@ -9,10 +9,17 @@ import (
 )
 
 func main() {
-	err := tui.Run(renderBlocks)
+	err := tui.Run(renderList)
 	if err != nil {
 		panic(err)
 	}
+}
+
+func renderList() *tui.View {
+	selected := tui.UseRef(0)
+	return tui.ListMapN(selected, 100, func(i int) *tui.View {
+		return tui.String(strings.Repeat(fmt.Sprintf("%03d;", i), 100))
+	}).Border()
 }
 
 func renderBlocks() *tui.View {
@@ -22,11 +29,10 @@ func renderBlocks() *tui.View {
 	}).Border().Padding(1, 2).OffsetY(cursor).KeyHandler(func(r rune) any {
 		switch r {
 		case key.ArrowUp:
-			setCursor(cursor+1)
+			setCursor(cursor + 1)
 		case key.ArrowDown:
-			setCursor(cursor-1)
+			setCursor(cursor - 1)
 		}
 		return true
 	}).AllowOverflow()
 }
-

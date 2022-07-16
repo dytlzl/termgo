@@ -2,6 +2,8 @@ package tui
 
 import (
 	"fmt"
+
+	"github.com/dytlzl/tervi/pkg/key"
 )
 
 type View struct {
@@ -266,15 +268,43 @@ func ZStack(views ...*View) *View {
 	return &View{children: func() []*View { return views }}
 }
 
-func List(views ...*View) *View {
+func List(selected *int, views ...*View) *View {
 	v := &View{dir: vertical}
 	v.children = func() []*View {
-		height := v.absoluteHeight - int(v.paddingTop) - int(v.paddingBottom)
-		if len(views) > height {
-			height = len(views)
+		offset := useRef(0, 2)
+		if *selected >= len(views) {
+			*selected = len(views) - 1
 		}
-		return views[:height]
+		if *selected < 0 {
+			*selected = 0
+		}
+		height := v.absoluteHeight - int(v.paddingTop) - int(v.paddingBottom)
+		for i := range views {
+			views[i].absoluteHeight = 1
+			if i == *selected {
+				views[i].Underline()
+			}
+		}
+		if *selected+*offset >= height {
+			*offset = height - *selected - 1
+		}
+		if *selected < -*offset {
+			*offset = -*selected
+		}
+		v.offsetY = *offset
+		return views
 	}
+	v.KeyHandler(func(r rune) any {
+		switch r {
+		case key.ArrowUp:
+			*selected--
+		case key.ArrowDown:
+			*selected++
+		default:
+			return nil
+		}
+		return true
+	})
 	return v
 }
 
@@ -358,6 +388,14 @@ func InlineMap[T any](slice []T, fn func(T) *View) *View {
 
 func InlineMapN(number int, fn func(int) *View) *View {
 	return InlineStack(MapN(number, fn)...)
+}
+
+func ListMap[T any](selected *int, slice []T, fn func(T) *View) *View {
+	return List(selected, Map(slice, fn)...)
+}
+
+func ListMapN(selected *int, number int, fn func(int) *View) *View {
+	return List(selected, MapN(number, fn)...)
 }
 
 func If[T any](condition bool, t T, f T) T {

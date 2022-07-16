@@ -173,5 +173,5 @@ func heightFromWidth(slice []text, width int) int {
 			x += w
 		}
 	}
-	return y+1
+	return y + 1
 }

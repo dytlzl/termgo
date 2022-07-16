@@ -229,9 +229,6 @@ func computeView(r *renderer, v *View, cfg *config, frame rect, parentFrame rect
 	availableWidth := frame.width - int(v.paddingLeading) - int(v.paddingTrailing)
 	availableHeight := frame.height - int(v.paddingTop) - int(v.paddingBottom)
 
-	accumulatedX := frame.x + int(v.paddingLeading)
-	accumulatedY := frame.y + int(v.paddingTop) + v.offsetY
-
 	remainedWidth := availableWidth
 	remainedHeight := availableHeight
 	numberOfAutoWidth := 0
@@ -278,6 +275,9 @@ func computeView(r *renderer, v *View, cfg *config, frame rect, parentFrame rect
 			numberOfAutoHeight++
 		}
 	}
+
+	accumulatedX := frame.x + int(v.paddingLeading)
+	accumulatedY := frame.y + int(v.paddingTop) + v.offsetY
 
 	for _, child := range children {
 		if child == nil {
