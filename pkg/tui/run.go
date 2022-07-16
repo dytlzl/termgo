@@ -41,7 +41,7 @@ func Print(createView func() *View, options ...option) error {
 	v := ZStack(createView())
 
 	// Render views
-	err = renderView(r, v, &cfg, rect{0, 0, r.width, r.height}, style{})
+	err = renderView(r, v, &cfg, rect{0, 0, r.width, r.height}, rect{0, 0, r.width, r.height}, style{})
 	if err != nil {
 		return fmt.Errorf("failed to render view: %w", err)
 	}
@@ -174,7 +174,7 @@ func Run(createView func() *View, options ...option) error {
 		v := ZStack(createView())
 		cfg.focusedView = nil
 		// Render views
-		err = renderView(r, v, &cfg, rect{0, 0, r.width, r.height}, style{})
+		err = renderView(r, v, &cfg, rect{0, 0, r.width, r.height}, rect{0, 0, r.width, r.height}, style{})
 		if err != nil {
 			return fmt.Errorf("failed to render view: %w", err)
 		}
@@ -189,10 +189,14 @@ type terminate struct{}
 
 var Terminate = terminate{}
 
-var bufferForDebug = make([]any, 0)
-
-func renderView(r *renderer, v *View, cfg *config, frame rect, defaultStyle style) error {
-	vr, err := newViewRenderer(r, frame.x, frame.y, frame.width, frame.height, int(v.paddingTop), int(v.paddingLeading), int(v.paddingBottom), int(v.paddingTrailing))
+func renderView(r *renderer, v *View, cfg *config, frame rect, parentRect rect, defaultStyle style) error {
+	vr, err := newViewRenderer(
+		r,
+		frame.x, frame.y,
+		frame.width, frame.height,
+		int(v.paddingTop), int(v.paddingLeading), int(v.paddingBottom), int(v.paddingTrailing),
+		true,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to create viewRenderer: %w", err)
 	}
@@ -228,32 +232,44 @@ func renderView(r *renderer, v *View, cfg *config, frame rect, defaultStyle styl
 	numberOfAutoWidth := 0
 	numberOfAutoHeight := 0
 
-	for idx := range v.children {
-		if v.children[idx] == nil {
+	children := func() []*View {
+		if v.children == nil {
+			return nil
+		} else {
+			return v.children()
+		}
+	}()
+
+	for idx := range children {
+		if children[idx] == nil {
 			continue
 		}
-		if v.children[idx].absoluteWidth == 0 {
-			v.children[idx].absoluteWidth = availableWidth * int(v.children[idx].relativeWidth) / 12
+		// calculate absolute size from relative size
+		if children[idx].absoluteWidth == 0 {
+			children[idx].absoluteWidth = availableWidth * int(children[idx].relativeWidth) / 12
 		}
-		if v.children[idx].absoluteHeight == 0 {
-			v.children[idx].absoluteHeight = availableHeight * int(v.children[idx].relativeHeight) / 12
+		if children[idx].absoluteHeight == 0 {
+			children[idx].absoluteHeight = availableHeight * int(children[idx].relativeHeight) / 12
 		}
 
-		remainedWidth -= v.children[idx].absoluteWidth
-		remainedHeight -= v.children[idx].absoluteHeight
+		remainedWidth -= children[idx].absoluteWidth
+		remainedHeight -= children[idx].absoluteHeight
 
-		if v.children[idx].absoluteWidth == 0 {
+		// count auto-sizing view
+		if children[idx].absoluteWidth == 0 {
 			numberOfAutoWidth++
 		}
-
-		if v.children[idx].absoluteHeight == 0 {
+		if children[idx].absoluteHeight == 0 {
 			numberOfAutoHeight++
 		}
 	}
-	for _, child := range v.children {
+
+	for _, child := range children {
 		if child == nil {
 			continue
 		}
+
+		// calculate size of auto-sizing view
 		if child.absoluteWidth == 0 {
 			if v.dir == horizontal {
 				child.absoluteWidth = remainedWidth / numberOfAutoWidth
@@ -282,12 +298,20 @@ func renderView(r *renderer, v *View, cfg *config, frame rect, defaultStyle styl
 			y = accumulatedY
 		}
 
-		err = renderView(r, child, cfg, rect{
-			x,
-			y,
-			child.absoluteWidth,
-			child.absoluteHeight,
-		}, *v.style)
+		err = renderView(r, child, cfg,
+			rect{
+				x,
+				y,
+				child.absoluteWidth,
+				child.absoluteHeight,
+			},
+			rect{
+				frame.x,
+				frame.y,
+				v.absoluteWidth,
+				v.absoluteHeight,
+			},
+			*v.style)
 		if err != nil {
 			return err
 		}
@@ -306,4 +330,10 @@ type rect struct {
 	y      int
 	width  int
 	height int
+}
+
+var bufferForDebug = make([]any, 0)
+
+func pushDebugData(data any) {
+	bufferForDebug = append(bufferForDebug, data)
 }

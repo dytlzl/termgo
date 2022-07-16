@@ -14,11 +14,12 @@ type View struct {
 	paddingBottom   uint8
 	paddingTrailing uint8
 	priority        int8
+	allowOverflow   bool
 	title           string
 	dir             direction
 	style           *style
 	border          *style
-	children        []*View
+	children        func() []*View
 	keyHandler      func(rune) any
 	renderer        func() []text
 }
@@ -237,15 +238,27 @@ func Spacer() *View {
 }
 
 func HStack(views ...*View) *View {
-	return &View{children: views, dir: horizontal}
+	return &View{children: func() []*View { return views }, dir: horizontal}
 }
 
 func VStack(views ...*View) *View {
-	return &View{children: views, dir: vertical}
+	return &View{children: func() []*View { return views }, dir: vertical}
 }
 
 func ZStack(views ...*View) *View {
-	return &View{children: views}
+	return &View{children: func() []*View { return views }}
+}
+
+func List(views ...*View) *View {
+	v := &View{dir: vertical}
+	v.children = func() []*View {
+		height := v.absoluteHeight - int(v.paddingTop) - int(v.paddingBottom)
+		if len(views) > height {
+			height = len(views)
+		}
+		return views[:height]
+	}
+	return v
 }
 
 func String(s string) *View {
@@ -314,8 +327,12 @@ func VMap[T any](slice []T, fn func(T) *View) *View {
 	return VStack(Map(slice, fn)...)
 }
 
+func VMapN(number int, fn func(int) *View) *View {
+	return VStack(MapN(number, fn)...)
+}
+
 func ZMap[T any](slice []T, fn func(T) *View) *View {
-	return VStack(Map(slice, fn)...)
+	return ZStack(Map(slice, fn)...)
 }
 
 func InlineMap[T any](slice []T, fn func(T) *View) *View {

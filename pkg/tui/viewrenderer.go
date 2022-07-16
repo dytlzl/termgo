@@ -18,14 +18,15 @@ type viewRenderer struct {
 	paddingTrailing int
 }
 
-func newViewRenderer(r *renderer, x, y, width, height, paddingTop, paddingLeading, paddingBottom, paddingTrailing int) (*viewRenderer, error) {
-	if x+width > r.width || y+height > r.height {
+func newViewRenderer(r *renderer, x, y, width, height, paddingTop, paddingLeading, paddingBottom, paddingTrailing int, allowOverflow bool) (*viewRenderer, error) {
+	if !allowOverflow && (x+width > r.width || y+height > r.height) {
 		return nil, errors.New("terminal size is too small")
 	}
 	return &viewRenderer{r, x, y, width, height, paddingTop, paddingLeading, paddingBottom, paddingTrailing}, nil
 }
 
 func (w *viewRenderer) putBody(slice []text, defaultStyle style) {
+	bufferForDebug = append(bufferForDebug,[]int{w.y, w.paddingTop, w.paddingBottom, w.height, w.renderer.height})
 	x, y := 0, 0
 	for _, as := range slice {
 		as.Style.merge(defaultStyle)
@@ -43,7 +44,7 @@ func (w *viewRenderer) putBody(slice []text, defaultStyle style) {
 				y++
 				x = 0
 			}
-			if y >= w.height-w.paddingTop-w.paddingBottom {
+			if w.paddingTop+y+w.paddingBottom >= w.height {
 				return
 			}
 			w.put(cell{Char: r, Width: width, Style: as.Style}, x, y)
@@ -81,15 +82,15 @@ func (w *viewRenderer) putBorder(s style) {
 func (w *viewRenderer) putTitle(slice []text) {
 	x := 2 - w.paddingTop
 	for _, as := range slice {
-		for _, rune_ := range as.Str {
-			if rune_ == '\n' {
+		for _, r := range as.Str {
+			if r == '\n' {
 				return
 			}
-			width := RuneWidth(rune_)
+			width := RuneWidth(r)
 			if x+width > w.width-w.paddingLeading-w.paddingTrailing {
 				return
 			}
-			w.put(cell{Char: rune_, Width: width, Style: as.Style}, x, -w.paddingTop)
+			w.put(cell{Char: r, Width: width, Style: as.Style}, x, -w.paddingTop)
 			if width == 2 {
 				w.put(cell{Char: ' ', Width: 0}, x+1, -w.paddingTop)
 			}
