@@ -71,14 +71,14 @@ func (w *viewRenderer) putBorder(s style) {
 	}
 	w.renderer.rows[w.frame.y][w.frame.x+w.frame.width-1] = cell{Char: '╮', Width: 1, Style: s}
 	for y := 1; y < w.frame.height-1; y++ {
-		if w.frame.y+w.paddingTop+y-2+w.paddingBottom >= w.parentFrame.y+w.parentFrame.height {
+		if w.frame.y+y >= w.parentFrame.y+w.parentFrame.height {
 			return
 		}
 		c := cell{Char: '│', Width: 1, Style: s}
 		w.renderer.rows[w.frame.y+y][w.frame.x] = c
 		w.renderer.rows[w.frame.y+y][w.frame.x+w.frame.width-1] = c
 	}
-	if w.frame.y+w.paddingTop+w.frame.height-3+w.paddingBottom >= w.parentFrame.y+w.parentFrame.height {
+	if w.frame.y+w.frame.height-1 >= w.parentFrame.y+w.parentFrame.height {
 		return
 	}
 	w.renderer.rows[w.frame.y+w.frame.height-1][w.frame.x] = cell{Char: '╰', Width: 1, Style: s}
