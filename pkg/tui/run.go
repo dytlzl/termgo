@@ -41,7 +41,7 @@ func Print(createView func() *View, options ...option) error {
 	v := ZStack(createView())
 
 	// Render views
-	err = computeView(r, v, &cfg, rect{0, 0, r.width, r.height}, rect{0, 0, r.width, r.height}, style{})
+	err = computeView(r, v, &cfg, rect{0, 0, r.width, r.height}, rect{0, 0, r.width, r.height}, style{}, false)
 	if err != nil {
 		return fmt.Errorf("failed to render view: %w", err)
 	}
@@ -175,7 +175,7 @@ func Run(createView func() *View, options ...option) error {
 		cfg.focusedView = nil
 
 		// Render views
-		err = computeView(r, v, &cfg, rect{0, 0, r.width, r.height}, rect{0, 0, r.width, r.height}, style{})
+		err = computeView(r, v, &cfg, rect{0, 0, r.width, r.height}, rect{0, 0, r.width, r.height}, style{}, false)
 		if err != nil {
 			return fmt.Errorf("failed to render view: %w", err)
 		}
@@ -190,13 +190,13 @@ type terminate struct{}
 
 var Terminate = terminate{}
 
-func computeView(r *renderer, v *View, cfg *config, frame rect, parentFrame rect, defaultStyle style) error {
+func computeView(r *renderer, v *View, cfg *config, frame rect, parentFrame rect, defaultStyle style, allowOverflow bool) error {
 	vr, err := newViewRenderer(
 		r,
 		frame,
 		parentFrame,
 		int(v.paddingTop), int(v.paddingLeading), int(v.paddingBottom), int(v.paddingTrailing),
-		true,
+		allowOverflow,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create viewRenderer: %w", err)
@@ -243,10 +243,26 @@ func computeView(r *renderer, v *View, cfg *config, frame rect, parentFrame rect
 		if children[idx] == nil {
 			continue
 		}
+
+		if children[idx].style == nil {
+			children[idx].style = new(style)
+		}
 		// calculate absolute size from relative size
 		if children[idx].absoluteWidth == 0 {
 			children[idx].absoluteWidth = availableWidth * int(children[idx].relativeWidth) / 12
 		}
+		if children[idx].absoluteHeight == 0 && v.dir == vertical && children[idx].renderer != nil {
+			if children[idx].absoluteWidth == 0 {
+				children[idx].absoluteWidth = availableWidth
+			}
+			children[idx].absoluteHeight = heightFromWidth(
+				children[idx].renderer(),
+				children[idx].absoluteWidth-int(children[idx].paddingLeading)-int(children[idx].paddingTrailing),
+			) +
+				int(children[idx].paddingTop) +
+				int(children[idx].paddingBottom)
+		}
+
 		if children[idx].absoluteHeight == 0 {
 			children[idx].absoluteHeight = availableHeight * int(children[idx].relativeHeight) / 12
 		}
@@ -314,7 +330,8 @@ func computeView(r *renderer, v *View, cfg *config, frame rect, parentFrame rect
 				v.absoluteWidth - int(v.paddingLeading) - int(v.paddingTrailing),
 				v.absoluteHeight - int(v.paddingTop) - int(v.paddingBottom),
 			},
-			*v.style)
+			*v.style,
+			allowOverflow || v.allowOverflow)
 		if err != nil {
 			return err
 		}

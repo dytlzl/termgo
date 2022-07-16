@@ -14,6 +14,7 @@ type View struct {
 	paddingBottom   uint8
 	paddingTrailing uint8
 	priority        int8
+	allowOverflow   bool
 	offsetY         int
 	title           string
 	dir             direction
@@ -202,6 +203,14 @@ func (v *View) OffsetY(i int) *View {
 		return nil
 	}
 	v.offsetY = i
+	return v
+}
+
+func (v *View) AllowOverflow() *View {
+	if v == nil {
+		return nil
+	}
+	v.allowOverflow = true
 	return v
 }
 

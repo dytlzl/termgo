@@ -39,7 +39,6 @@ func (w *viewRenderer) putBody(slice []text, defaultStyle style) {
 			width := runewidth.RuneWidth(r)
 			if x+width > w.frame.width-w.paddingLeading-w.paddingTrailing {
 				y++
-				// debugf("%d %d %d %d %d %d", w.frame.y, w.paddingTop, y, w.paddingBottom, w.parentFrame.y, w.parentFrame.height)
 				x = 0
 			}
 			if w.paddingTop+y+w.paddingBottom >= w.frame.height {
@@ -102,6 +101,9 @@ func (w *viewRenderer) putBorder(s style) {
 }
 
 func (w *viewRenderer) putTitle(slice []text) {
+	if w.frame.y < w.parentFrame.y {
+		return
+	}
 	x := 2 - w.paddingTop
 	for _, as := range slice {
 		for _, r := range as.Str {
@@ -149,4 +151,27 @@ func RuneWidth(r rune) int {
 		return 1
 	}
 	return runewidth.RuneWidth(r)
+}
+
+func heightFromWidth(slice []text, width int) int {
+	x, y := 0, 0
+	for _, as := range slice {
+		for _, r := range as.Str {
+			if r == 13 { // CR
+				continue
+			}
+			if r == 10 { // NL
+				y++
+				x = 0
+				continue
+			}
+			w := runewidth.RuneWidth(r)
+			if x+w > width {
+				y++
+				x = 0
+			}
+			x += w
+		}
+	}
+	return y+1
 }
