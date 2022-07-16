@@ -14,7 +14,7 @@ type View struct {
 	paddingBottom   uint8
 	paddingTrailing uint8
 	priority        int8
-	allowOverflow   bool
+	offsetY         int
 	title           string
 	dir             direction
 	style           *style
@@ -194,6 +194,14 @@ func (v *View) Border(options ...borderOption) *View {
 	for _, option := range options {
 		option(v)
 	}
+	return v
+}
+
+func (v *View) OffsetY(i int) *View {
+	if v == nil {
+		return nil
+	}
+	v.offsetY = i
 	return v
 }
 
