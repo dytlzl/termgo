@@ -80,15 +80,20 @@ func Run(createView func() *View, options ...option) error {
 				return nil
 			}
 			handled := false
-			for cfg.viewPQ.Len() > 0 {
-				v := cfg.viewPQ.PopView()
+			pq := newQueue()
+			for _, v := range cfg.viewPQ {
+				pq.PushView(v)
+			}
+		Depth2:
+			for pq.Len() > 0 {
+				v := pq.PopView()
 				switch v.keyHandler(ch).(type) {
 				case terminate:
 					return nil
 				case nil:
 				default:
 					handled = true
-					break
+					break Depth2
 				}
 			}
 			if cfg.eventHandler != nil && !handled {
@@ -133,6 +138,7 @@ func Run(createView func() *View, options ...option) error {
 		v := ZStack(createView()).AbsoluteSize(w.width, w.height)
 
 		// Render views
+		cfg.viewPQ = newQueue()
 		err = moldView(w, v, &cfg, rect{0, 0, w.width, w.height}, rect{0, 0, w.width, w.height}, style{}, false)
 		if err != nil {
 			return fmt.Errorf("failed to render view: %w", err)

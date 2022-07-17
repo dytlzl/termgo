@@ -37,6 +37,7 @@ func moldView(r cellWriter, v *View, cfg *config, frame rect, parentFrame rect, 
 	}
 	if v.keyHandler != nil {
 		cfg.viewPQ.PushView(v)
+		debugf("%d", cfg.viewPQ.Len())
 	}
 
 	if v.children == nil {
