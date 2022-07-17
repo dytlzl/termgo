@@ -308,6 +308,40 @@ func List(selected *int, views ...*View) *View {
 	return v
 }
 
+func ScrollView(views ...*View) *View {
+	v := &View{dir: vertical}
+	offset := useRef(0, 2)
+	v.children = func() []*View {
+		height := v.absoluteHeight - int(v.paddingTop) - int(v.paddingBottom)
+		width := v.absoluteWidth - int(v.paddingLeading) - int(v.paddingTrailing)
+		innerHeight := 0
+		for _, child := range views {
+			innerHeight += heightFromWidth(child.renderer(), width-int(child.paddingLeading)-int(child.paddingTrailing)) + int(child.paddingTop) + int(child.paddingBottom)
+		}
+		if height-*offset >= innerHeight {
+			*offset = height - innerHeight
+		}
+		if *offset > 0 {
+			*offset = 0
+		}
+		v.offsetY = *offset
+		return views
+	}
+	v.allowOverflow = true
+	v.KeyHandler(func(r rune) any {
+		switch r {
+		case key.ArrowUp:
+			*offset++
+		case key.ArrowDown:
+			*offset--
+		default:
+			return nil
+		}
+		return true
+	})
+	return v
+}
+
 func String(s string) *View {
 	view := &View{}
 	view.renderer = func() []text {

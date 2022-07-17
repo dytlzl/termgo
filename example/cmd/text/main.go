@@ -7,7 +7,7 @@ import (
 func main() {
 	err := tui.Run(func() *tui.View {
 		return tui.ZStack(
-			tui.InlineStack(
+			tui.ScrollView(
 				tui.String(dograMagra1).Bold(),
 				tui.String(dograMagra2).Italic(),
 				tui.String(dograMagra3).Underline(),

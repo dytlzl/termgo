@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"io/fs"
+	"io/ioutil"
 	"strings"
 
 	"github.com/dytlzl/tervi/pkg/key"
@@ -13,13 +15,27 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	if name != "" {
+		fmt.Println(name)
+	}
 }
+
+var name = ""
 
 func renderList() *tui.View {
 	selected := tui.UseRef(0)
-	return tui.ListMapN(selected, 100, func(i int) *tui.View {
-		return tui.String(strings.Repeat(fmt.Sprintf("%03d;", i), 100))
-	}).Border()
+	files, _ := ioutil.ReadDir(".")
+	return tui.ZStack(tui.ListMap(selected, files, func(file fs.FileInfo) *tui.View {
+		return tui.HStack(tui.String(file.Name()).AbsoluteSize(20, 1), tui.Fmt("%d", file.Size()))
+	}).Border().Padding(1, 2)).KeyHandler(func(r rune) any {
+		switch r {
+		case key.Enter:
+			name = files[*selected].Name()
+			return tui.Terminate
+		default:
+			return nil
+		}
+	})
 }
 
 func renderBlocks() *tui.View {

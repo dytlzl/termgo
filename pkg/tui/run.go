@@ -10,7 +10,9 @@ import (
 )
 
 func Print(createView func() *View, options ...option) error {
-	cfg := config{}
+	cfg := config{
+		viewPQ: newQueue(),
+	}
 	for _, opt := range options {
 		err := opt(&cfg)
 		if err != nil {
@@ -120,19 +122,19 @@ func Run(createView func() *View, options ...option) error {
 			if ch == key.CtrlC {
 				return nil
 			}
-			if cfg.focusedView != nil {
-				switch cfg.focusedView.keyHandler(ch).(type) {
+			handled := false
+			for cfg.viewPQ.Len() > 0 {
+				v := cfg.viewPQ.PopView()
+				switch v.keyHandler(ch).(type) {
 				case terminate:
 					return nil
 				case nil:
-					if cfg.eventHandler != nil {
-						switch cfg.eventHandler(ch).(type) {
-						case terminate:
-							return nil
-						}
-					}
+				default:
+					handled = true
+					break
 				}
-			} else if cfg.eventHandler != nil {
+			}
+			if cfg.eventHandler != nil && !handled {
 				switch cfg.eventHandler(ch).(type) {
 				case terminate:
 					return nil
@@ -172,7 +174,6 @@ func Run(createView func() *View, options ...option) error {
 		r.fill(style{})
 
 		v := ZStack(createView()).AbsoluteSize(r.width, r.height)
-		cfg.focusedView = nil
 
 		// Render views
 		err = computeView(r, v, &cfg, rect{0, 0, r.width, r.height}, rect{0, 0, r.width, r.height}, style{}, false)
@@ -218,8 +219,8 @@ func computeView(r *renderer, v *View, cfg *config, frame rect, parentFrame rect
 	if v.renderer != nil {
 		vr.putBody(v.renderer(), *v.style)
 	}
-	if v.keyHandler != nil && (cfg.focusedView == nil || v.priority >= cfg.focusedView.priority) {
-		cfg.focusedView = v
+	if v.keyHandler != nil {
+		cfg.viewPQ.PushView(v)
 	}
 
 	if v.children == nil {

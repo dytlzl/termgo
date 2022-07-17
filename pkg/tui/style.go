@@ -24,5 +24,17 @@ func (s *style) merge(defaultStyle style) {
 		if !s.reverse {
 			s.reverse = defaultStyle.reverse
 		}
+		if !s.bold {
+			s.bold = defaultStyle.bold
+		}
+		if !s.italic {
+			s.italic = defaultStyle.italic
+		}
+		if !s.strikethrough {
+			s.strikethrough = defaultStyle.strikethrough
+		}
+		if !s.underline {
+			s.underline = defaultStyle.underline
+		}
 	}
 }
