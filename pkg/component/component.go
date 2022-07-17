@@ -139,5 +139,6 @@ func QuitView(isOpen, isConfirmed *bool) *tui.View {
 			}
 			return true
 		}).
+		Priority(100).
 		Hidden(!*isOpen)
 }

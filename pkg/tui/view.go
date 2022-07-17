@@ -224,6 +224,14 @@ func (v *View) KeyHandler(fn func(rune) any) *View {
 	return v
 }
 
+func (v *View) Priority(priority int8) *View {
+	if v == nil {
+		return nil
+	}
+	v.priority = priority
+	return v
+}
+
 func (v *View) Hidden(isHidden bool) *View {
 	if isHidden {
 		return nil
