@@ -24,7 +24,7 @@ type View struct {
 	border          *style
 	children        func() []*View
 	keyHandler      func(rune) any
-	renderer        func() []text
+	content         func() []text
 }
 
 type direction int
@@ -248,7 +248,7 @@ type borderOption = func(*View)
 
 func TextView(body string) *View {
 	v := &View{}
-	v.renderer = func() []text { return []text{{Str: body, Style: *v.style}} }
+	v.content = func() []text { return []text{{Str: body, Style: *v.style}} }
 	return v
 }
 
@@ -316,7 +316,7 @@ func ScrollView(views ...*View) *View {
 		width := v.absoluteWidth - int(v.paddingLeading) - int(v.paddingTrailing)
 		innerHeight := 0
 		for _, child := range views {
-			innerHeight += heightFromWidth(child.renderer(), width-int(child.paddingLeading)-int(child.paddingTrailing)) + int(child.paddingTop) + int(child.paddingBottom)
+			innerHeight += heightFromWidth(child.content(), width-int(child.paddingLeading)-int(child.paddingTrailing)) + int(child.paddingTop) + int(child.paddingBottom)
 		}
 		if height-*offset >= innerHeight {
 			*offset = height - innerHeight
@@ -344,7 +344,7 @@ func ScrollView(views ...*View) *View {
 
 func String(s string) *View {
 	view := &View{}
-	view.renderer = func() []text {
+	view.content = func() []text {
 		return []text{{Str: s, Style: *view.style}}
 	}
 	return view
@@ -367,7 +367,7 @@ func Break() *View {
 
 func InlineStack(views ...*View) *View {
 	view := &View{}
-	view.renderer = func() []text {
+	view.content = func() []text {
 		slice := make([]text, 0)
 		for _, child := range views {
 			if child == nil {
@@ -377,7 +377,7 @@ func InlineStack(views ...*View) *View {
 				child.style = new(style)
 			}
 			child.style.merge(*view.style)
-			slice = append(slice, child.renderer()...)
+			slice = append(slice, child.content()...)
 		}
 		return slice
 	}

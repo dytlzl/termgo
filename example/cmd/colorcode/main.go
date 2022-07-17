@@ -5,7 +5,7 @@ import (
 )
 
 func main() {
-	err := tui.Print(rootView)
+	err := tui.Run(rootView)
 	if err != nil {
 		panic(err)
 	}
