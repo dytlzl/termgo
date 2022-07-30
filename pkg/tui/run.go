@@ -3,9 +3,12 @@ package tui
 import (
 	"bufio"
 	"fmt"
+	"log"
+	"net"
 	"os"
 	"time"
 
+	"github.com/dytlzl/tervi/internal/debug"
 	"github.com/dytlzl/tervi/pkg/key"
 )
 
@@ -21,6 +24,14 @@ func Run(createView func() *View, options ...option) error {
 	}
 
 	isAlternative := true
+
+	conn, err := net.Dial("udp", fmt.Sprintf("127.0.0.1:%d", debug.UDP_PORT))
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	log.SetOutput(conn)
+	benchmarker = new(Benchmarker)
 
 	w, err := newGeneralCellWriter(isAlternative)
 	if err != nil {
@@ -57,13 +68,14 @@ func Run(createView func() *View, options ...option) error {
 	}()
 
 	for {
+		benchmarker.start()
 		shouldSkipRendering := false
 	Depth1:
 		for {
 			select {
 			case k := <-keyChannel:
 				keyBuffer = append(keyBuffer, k)
-			case <-time.After(time.Millisecond):
+			case <-time.After(time.Microsecond * 100):
 				break Depth1
 			}
 		}
@@ -108,7 +120,7 @@ func Run(createView func() *View, options ...option) error {
 			case event := <-w.eventChan:
 				shouldSkipRendering = false
 				return event
-			case <-time.After(time.Millisecond * 10):
+			case <-time.After(time.Microsecond):
 				return nil
 			}
 		}()
@@ -132,10 +144,14 @@ func Run(createView func() *View, options ...option) error {
 			continue
 		}
 
+		benchmarker.benchmark("event")
+
 		// Clear
 		w.fill(style{})
+		benchmarker.benchmark("fill")
 
 		v := ZStack(createView()).AbsoluteSize(w.width, w.height)
+		benchmarker.benchmark("createView")
 
 		// Render views
 		cfg.viewPQ = newQueue()
@@ -143,9 +159,12 @@ func Run(createView func() *View, options ...option) error {
 		if err != nil {
 			return fmt.Errorf("failed to render view: %w", err)
 		}
+		benchmarker.benchmark("moldView")
 
 		// Draw
 		w.draw()
+
+		benchmarker.log()
 
 	}
 }
@@ -158,4 +177,29 @@ var bufferForDebug = make([]string, 0)
 
 func debugf(format string, a ...any) {
 	bufferForDebug = append(bufferForDebug, fmt.Sprintf(format, a...))
+}
+
+type Benchmarker struct {
+	buffer    string
+	startTime time.Time
+	lastTime  time.Time
+}
+
+var benchmarker *Benchmarker
+
+func (b *Benchmarker) start() {
+	b.buffer = ""
+	b.startTime = time.Now()
+	b.lastTime = b.startTime
+}
+
+func (b *Benchmarker) benchmark(phase string) {
+	b.buffer += fmt.Sprintf("%s: %5dμs; ", phase, time.Since(b.lastTime).Microseconds())
+	b.lastTime = time.Now()
+}
+
+func (b *Benchmarker) log() {
+	message := fmt.Sprintf("%stotal: %5dμs", b.buffer, time.Since(b.startTime).Microseconds())
+	b.buffer = ""
+	go log.Println(message)
 }

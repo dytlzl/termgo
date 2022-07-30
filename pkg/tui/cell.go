@@ -30,6 +30,8 @@ type generalCellWriter struct {
 	width         int
 	height        int
 	rows          [][]cell
+	buffer        []string
+	backBuffer    []string
 	cursorX       int
 	cursorY       int
 	eventChan     chan any
@@ -53,6 +55,8 @@ func newGeneralCellWriter(isAlternative bool) (*generalCellWriter, error) {
 		isAlternative: isAlternative,
 		height:        If(isAlternative, 0, height),
 		cursorY:       If(isAlternative, 0, height-1),
+		buffer:        make([]string, 1024),
+		backBuffer:    make([]string, 1024),
 		ttyin:         ttyin,
 		eventChan:     make(chan any, 64),
 		oldState:      state,
@@ -144,36 +148,34 @@ func (w *generalCellWriter) draw() {
 		csi(fmt.Sprintf("%dA", w.cursorY-1))
 		push("\r")
 	}
-	lastStyle := style{}
+
 	for y := 0; y < w.height; y++ {
-		if y != 0 {
-			csi("1B")
-			push("\r")
-		}
+		w.buffer[y] = "\r"
+		lastStyle := style{}
 		for x := 0; x < w.width; x++ {
 			s := w.rows[y][x].Style
 			if s != lastStyle {
-				push("\033[1;0m")
+				w.buffer[y] += "\033[1;0m"
 				if s.f256 != 0 {
-					push(fmt.Sprintf("\033[38;5;%dm", s.f256))
+					w.buffer[y] += fmt.Sprintf("\033[38;5;%dm", s.f256)
 				}
 				if s.b256 != 0 {
-					push(fmt.Sprintf("\033[48;5;%dm", s.b256))
+					w.buffer[y] += fmt.Sprintf("\033[48;5;%dm", s.b256)
 				}
 				if s.bold {
-					push("\033[1m")
+					w.buffer[y] += "\033[1m"
 				}
 				if s.italic {
-					push("\033[3m")
+					w.buffer[y] += "\033[3m"
 				}
 				if s.underline {
-					push("\033[4m")
+					w.buffer[y] += "\033[4m"
 				}
 				if s.reverse {
-					push("\033[7m")
+					w.buffer[y] += "\033[7m"
 				}
 				if s.strikethrough {
-					push("\033[9m")
+					w.buffer[y] += "\033[9m"
 				}
 
 				lastStyle = s
@@ -184,10 +186,16 @@ func (w *generalCellWriter) draw() {
 				w.cursorX = x
 			}
 			if !(w.rows[y][x].Width == 0 && w.rows[y][x-1].Width == 2) {
-				push(string(w.rows[y][x].Char))
+				w.buffer[y] += string(w.rows[y][x].Char)
 			}
 		}
+		if w.backBuffer[y] == w.buffer[y] {
+			w.buffer[y] = ""
+		} else {
+			w.backBuffer[y] = w.buffer[y]
+		}
 	}
+	push(strings.Join(w.buffer[:w.height], "\x1b[1B"))
 	push("\033[1;0m") // Reset Style
 	if w.isAlternative {
 		origin()
@@ -197,7 +205,9 @@ func (w *generalCellWriter) draw() {
 	}
 	csi(fmt.Sprintf("%dB", w.cursorY))
 	csi(fmt.Sprintf("%dC", w.cursorX))
+	benchmarker.benchmark("lines")
 	flush()
+	benchmarker.benchmark("flush")
 }
 
 func (w *generalCellWriter) fd() int {
