@@ -29,8 +29,14 @@ func Test_readBuffer(t *testing.T) {
 			wantLength: 0,
 		},
 		{
-			name:       "return ArrowUp in buffer and 3",
-			buffer:     []rune{0x1b, 0x5b, 'A'},
+			name:       "return ArrowUp and 3 when ^[[A in buffer",
+			buffer:     []rune{0x1b, '[', 'A'},
+			wantKey:    key.ArrowUp,
+			wantLength: 3,
+		},
+		{
+			name:       "return ArrowUp and 3 when ^[OA in buffer",
+			buffer:     []rune{0x1b, 'O', 'A'},
 			wantKey:    key.ArrowUp,
 			wantLength: 3,
 		},

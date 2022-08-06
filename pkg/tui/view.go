@@ -2,6 +2,8 @@ package tui
 
 import (
 	"fmt"
+
+	"github.com/dytlzl/tervi/pkg/key"
 )
 
 type View struct {
@@ -14,13 +16,15 @@ type View struct {
 	paddingBottom   uint8
 	paddingTrailing uint8
 	priority        int8
+	allowOverflow   bool
+	offsetY         int
 	title           string
 	dir             direction
 	style           *style
 	border          *style
-	children        []*View
+	children        func() []*View
 	keyHandler      func(rune) any
-	renderer        func() []text
+	content         func() []text
 }
 
 type direction int
@@ -196,11 +200,35 @@ func (v *View) Border(options ...borderOption) *View {
 	return v
 }
 
+func (v *View) OffsetY(i int) *View {
+	if v == nil {
+		return nil
+	}
+	v.offsetY = i
+	return v
+}
+
+func (v *View) AllowOverflow() *View {
+	if v == nil {
+		return nil
+	}
+	v.allowOverflow = true
+	return v
+}
+
 func (v *View) KeyHandler(fn func(rune) any) *View {
 	if v == nil {
 		return nil
 	}
 	v.keyHandler = fn
+	return v
+}
+
+func (v *View) Priority(priority int8) *View {
+	if v == nil {
+		return nil
+	}
+	v.priority = priority
 	return v
 }
 
@@ -228,7 +256,7 @@ type borderOption = func(*View)
 
 func TextView(body string) *View {
 	v := &View{}
-	v.renderer = func() []text { return []text{{Str: body, Style: *v.style}} }
+	v.content = func() []text { return []text{{Str: body, Style: *v.style}} }
 	return v
 }
 
@@ -237,20 +265,94 @@ func Spacer() *View {
 }
 
 func HStack(views ...*View) *View {
-	return &View{children: views, dir: horizontal}
+	return &View{children: func() []*View { return views }, dir: horizontal}
 }
 
 func VStack(views ...*View) *View {
-	return &View{children: views, dir: vertical}
+	return &View{children: func() []*View { return views }, dir: vertical}
 }
 
 func ZStack(views ...*View) *View {
-	return &View{children: views}
+	return &View{children: func() []*View { return views }}
+}
+
+func List(selected *int, views ...*View) *View {
+	v := &View{dir: vertical}
+	v.children = func() []*View {
+		offset := useRef(0, 2)
+		if *selected >= len(views) {
+			*selected = len(views) - 1
+		}
+		if *selected < 0 {
+			*selected = 0
+		}
+		height := v.absoluteHeight - int(v.paddingTop) - int(v.paddingBottom)
+		for i := range views {
+			views[i].absoluteHeight = 1
+			if i == *selected {
+				views[i].Underline()
+			}
+		}
+		if *selected+*offset >= height {
+			*offset = height - *selected - 1
+		}
+		if *selected < -*offset {
+			*offset = -*selected
+		}
+		v.offsetY = *offset
+		return views
+	}
+	v.KeyHandler(func(r rune) any {
+		switch r {
+		case key.ArrowUp:
+			*selected--
+		case key.ArrowDown:
+			*selected++
+		default:
+			return nil
+		}
+		return true
+	})
+	return v
+}
+
+func ScrollView(views ...*View) *View {
+	v := &View{dir: vertical}
+	offset := useRef(0, 2)
+	v.children = func() []*View {
+		height := v.absoluteHeight - int(v.paddingTop) - int(v.paddingBottom)
+		width := v.absoluteWidth - int(v.paddingLeading) - int(v.paddingTrailing)
+		innerHeight := 0
+		for _, child := range views {
+			innerHeight += heightFromWidth(child.content(), width-int(child.paddingLeading)-int(child.paddingTrailing)) + int(child.paddingTop) + int(child.paddingBottom)
+		}
+		if height-*offset >= innerHeight {
+			*offset = height - innerHeight
+		}
+		if *offset > 0 {
+			*offset = 0
+		}
+		v.offsetY = *offset
+		return views
+	}
+	v.allowOverflow = true
+	v.KeyHandler(func(r rune) any {
+		switch r {
+		case key.ArrowUp:
+			*offset++
+		case key.ArrowDown:
+			*offset--
+		default:
+			return nil
+		}
+		return true
+	})
+	return v
 }
 
 func String(s string) *View {
 	view := &View{}
-	view.renderer = func() []text {
+	view.content = func() []text {
 		return []text{{Str: s, Style: *view.style}}
 	}
 	return view
@@ -273,7 +375,7 @@ func Break() *View {
 
 func InlineStack(views ...*View) *View {
 	view := &View{}
-	view.renderer = func() []text {
+	view.content = func() []text {
 		slice := make([]text, 0)
 		for _, child := range views {
 			if child == nil {
@@ -283,7 +385,7 @@ func InlineStack(views ...*View) *View {
 				child.style = new(style)
 			}
 			child.style.merge(*view.style)
-			slice = append(slice, child.renderer()...)
+			slice = append(slice, child.content()...)
 		}
 		return slice
 	}
@@ -314,8 +416,12 @@ func VMap[T any](slice []T, fn func(T) *View) *View {
 	return VStack(Map(slice, fn)...)
 }
 
+func VMapN(number int, fn func(int) *View) *View {
+	return VStack(MapN(number, fn)...)
+}
+
 func ZMap[T any](slice []T, fn func(T) *View) *View {
-	return VStack(Map(slice, fn)...)
+	return ZStack(Map(slice, fn)...)
 }
 
 func InlineMap[T any](slice []T, fn func(T) *View) *View {
@@ -324,6 +430,14 @@ func InlineMap[T any](slice []T, fn func(T) *View) *View {
 
 func InlineMapN(number int, fn func(int) *View) *View {
 	return InlineStack(MapN(number, fn)...)
+}
+
+func ListMap[T any](selected *int, slice []T, fn func(T) *View) *View {
+	return List(selected, Map(slice, fn)...)
+}
+
+func ListMapN(selected *int, number int, fn func(int) *View) *View {
+	return List(selected, MapN(number, fn)...)
 }
 
 func If[T any](condition bool, t T, f T) T {

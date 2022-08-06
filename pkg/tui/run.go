@@ -3,57 +3,19 @@ package tui
 import (
 	"bufio"
 	"fmt"
+	"log"
+	"net"
 	"os"
 	"time"
 
+	"github.com/dytlzl/tervi/internal/debug"
 	"github.com/dytlzl/tervi/pkg/key"
 )
 
-func Print(createView func() *View, options ...option) error {
-	cfg := config{}
-	for _, opt := range options {
-		err := opt(&cfg)
-		if err != nil {
-			return err
-		}
-	}
-
-	isAlternative := false
-
-	r, err := newRenderer(isAlternative)
-	if err != nil {
-		return fmt.Errorf("failed to init renderer: %w", err)
-	}
-	defer func() {
-		r.close(isAlternative)
-		for _, obj := range bufferForDebug {
-			fmt.Printf("%#v\n", obj)
-		}
-	}()
-
-	if changed, _ := r.updateTerminalSize(); changed {
-		r.shouldSkipRendering = false
-	}
-
-	// Clear
-	r.fill(style{})
-
-	v := ZStack(createView())
-
-	// Render views
-	err = renderView(r, v, &cfg, rect{0, 0, r.width, r.height}, style{})
-	if err != nil {
-		return fmt.Errorf("failed to render view: %w", err)
-	}
-
-	// Draw
-	r.draw()
-
-	return nil
-}
-
 func Run(createView func() *View, options ...option) error {
-	cfg := config{}
+	cfg := config{
+		viewPQ: newQueue(),
+	}
 	for _, opt := range options {
 		err := opt(&cfg)
 		if err != nil {
@@ -63,14 +25,22 @@ func Run(createView func() *View, options ...option) error {
 
 	isAlternative := true
 
-	r, err := newRenderer(isAlternative)
+	conn, err := net.Dial("udp", fmt.Sprintf("127.0.0.1:%d", debug.UDP_PORT))
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	log.SetOutput(conn)
+	benchmarker = new(Benchmarker)
+
+	w, err := newGeneralCellWriter(isAlternative)
 	if err != nil {
 		return fmt.Errorf("failed to init renderer: %w", err)
 	}
 	defer func() {
-		r.close(isAlternative)
-		for _, obj := range bufferForDebug {
-			fmt.Printf("%#v\n", obj)
+		w.close(isAlternative)
+		for _, line := range bufferForDebug {
+			fmt.Println(line)
 		}
 	}()
 	var shouldTerminate = false
@@ -80,7 +50,7 @@ func Run(createView func() *View, options ...option) error {
 			if event == Terminate {
 				shouldTerminate = true
 			}
-			r.eventChan <- event
+			w.eventChan <- event
 		}
 	}()
 
@@ -98,18 +68,19 @@ func Run(createView func() *View, options ...option) error {
 	}()
 
 	for {
-		r.shouldSkipRendering = false
+		benchmarker.start()
+		shouldSkipRendering := false
 	Depth1:
 		for {
 			select {
 			case k := <-keyChannel:
 				keyBuffer = append(keyBuffer, k)
-			case <-time.After(time.Millisecond):
+			case <-time.After(time.Microsecond * 100):
 				break Depth1
 			}
 		}
 		if len(keyBuffer) == 0 {
-			r.shouldSkipRendering = true
+			shouldSkipRendering = true
 		}
 		for {
 			ch, size := readBuffer(keyBuffer)
@@ -120,19 +91,24 @@ func Run(createView func() *View, options ...option) error {
 			if ch == key.CtrlC {
 				return nil
 			}
-			if cfg.focusedView != nil {
-				switch cfg.focusedView.keyHandler(ch).(type) {
+			handled := false
+			pq := newQueue()
+			for _, v := range cfg.viewPQ {
+				pq.PushView(v)
+			}
+		Depth2:
+			for pq.Len() > 0 {
+				v := pq.PopView()
+				switch v.keyHandler(ch).(type) {
 				case terminate:
 					return nil
 				case nil:
-					if cfg.eventHandler != nil {
-						switch cfg.eventHandler(ch).(type) {
-						case terminate:
-							return nil
-						}
-					}
+				default:
+					handled = true
+					break Depth2
 				}
-			} else if cfg.eventHandler != nil {
+			}
+			if cfg.eventHandler != nil && !handled {
 				switch cfg.eventHandler(ch).(type) {
 				case terminate:
 					return nil
@@ -141,10 +117,10 @@ func Run(createView func() *View, options ...option) error {
 		}
 		event := func() any {
 			select {
-			case event := <-r.eventChan:
-				r.shouldSkipRendering = false
+			case event := <-w.eventChan:
+				shouldSkipRendering = false
 				return event
-			case <-time.After(time.Millisecond * 10):
+			case <-time.After(time.Microsecond):
 				return nil
 			}
 		}()
@@ -156,31 +132,39 @@ func Run(createView func() *View, options ...option) error {
 			}
 		}
 
-		if changed, _ := r.updateTerminalSize(); changed {
-			r.shouldSkipRendering = false
+		if changed, _ := w.updateTerminalSize(); changed {
+			shouldSkipRendering = false
 		}
 
 		if shouldTerminate {
 			return nil
 		}
 
-		if r.shouldSkipRendering {
+		if shouldSkipRendering {
 			continue
 		}
 
-		// Clear
-		r.fill(style{})
+		benchmarker.benchmark("event")
 
-		v := ZStack(createView())
-		cfg.focusedView = nil
+		// Clear
+		w.fill(style{})
+		benchmarker.benchmark("fill")
+
+		v := ZStack(createView()).AbsoluteSize(w.width, w.height)
+		benchmarker.benchmark("createView")
+
 		// Render views
-		err = renderView(r, v, &cfg, rect{0, 0, r.width, r.height}, style{})
+		cfg.viewPQ = newQueue()
+		err = moldView(w, v, &cfg, rect{0, 0, w.width, w.height}, rect{0, 0, w.width, w.height}, style{}, false)
 		if err != nil {
 			return fmt.Errorf("failed to render view: %w", err)
 		}
+		benchmarker.benchmark("moldView")
 
 		// Draw
-		r.draw()
+		w.draw()
+
+		benchmarker.log()
 
 	}
 }
@@ -189,121 +173,38 @@ type terminate struct{}
 
 var Terminate = terminate{}
 
-var bufferForDebug = make([]any, 0)
+var bufferForDebug = make([]string, 0)
 
-func renderView(r *renderer, v *View, cfg *config, frame rect, defaultStyle style) error {
-	vr, err := newViewRenderer(r, frame.x, frame.y, frame.width, frame.height, int(v.paddingTop), int(v.paddingLeading), int(v.paddingBottom), int(v.paddingTrailing))
-	if err != nil {
-		return fmt.Errorf("failed to create viewRenderer: %w", err)
-	}
-	if v.style == nil {
-		v.style = new(style)
-	}
-	v.style.merge(defaultStyle)
-	if v.border != nil || v.title != "" || v.renderer != nil || v.style.b256 != 0 {
-		vr.fill(cell{' ', 1, *v.style})
-	}
-	if v.border != nil {
-		v.border.merge(*v.style)
-		vr.putBorder(*v.border)
-	}
-	if v.title != "" {
-		vr.putTitle([]text{{Str: " " + v.title + " ", Style: *v.style}})
-	}
-	if v.renderer != nil {
-		vr.putBody(v.renderer(), *v.style)
-	}
-	if v.keyHandler != nil && (cfg.focusedView == nil || v.priority >= cfg.focusedView.priority) {
-		cfg.focusedView = v
-	}
+var debugMode = false
 
-	availableWidth := frame.width - int(v.paddingLeading) - int(v.paddingTrailing)
-	availableHeight := frame.height - int(v.paddingTop) - int(v.paddingBottom)
-
-	accumulatedX := frame.x + int(v.paddingLeading)
-	accumulatedY := frame.y + int(v.paddingTop)
-
-	remainedWidth := availableWidth
-	remainedHeight := availableHeight
-	numberOfAutoWidth := 0
-	numberOfAutoHeight := 0
-
-	for idx := range v.children {
-		if v.children[idx] == nil {
-			continue
-		}
-		if v.children[idx].absoluteWidth == 0 {
-			v.children[idx].absoluteWidth = availableWidth * int(v.children[idx].relativeWidth) / 12
-		}
-		if v.children[idx].absoluteHeight == 0 {
-			v.children[idx].absoluteHeight = availableHeight * int(v.children[idx].relativeHeight) / 12
-		}
-
-		remainedWidth -= v.children[idx].absoluteWidth
-		remainedHeight -= v.children[idx].absoluteHeight
-
-		if v.children[idx].absoluteWidth == 0 {
-			numberOfAutoWidth++
-		}
-
-		if v.children[idx].absoluteHeight == 0 {
-			numberOfAutoHeight++
-		}
-	}
-	for _, child := range v.children {
-		if child == nil {
-			continue
-		}
-		if child.absoluteWidth == 0 {
-			if v.dir == horizontal {
-				child.absoluteWidth = remainedWidth / numberOfAutoWidth
-				numberOfAutoWidth--
-				remainedWidth -= child.absoluteWidth
-			} else {
-				child.absoluteWidth = availableWidth
-			}
-		}
-		if child.absoluteHeight == 0 {
-			if v.dir == vertical {
-				child.absoluteHeight = remainedHeight / numberOfAutoHeight
-				numberOfAutoHeight--
-				remainedHeight -= child.absoluteHeight
-			} else {
-				child.absoluteHeight = availableHeight
-			}
-		}
-
-		x := frame.x + int(v.paddingLeading) + (availableWidth-child.absoluteWidth)/2
-		if v.dir == horizontal {
-			x = accumulatedX
-		}
-		y := frame.y + int(v.paddingTop) + (availableHeight-child.absoluteHeight)/2
-		if v.dir == vertical {
-			y = accumulatedY
-		}
-
-		err = renderView(r, child, cfg, rect{
-			x,
-			y,
-			child.absoluteWidth,
-			child.absoluteHeight,
-		}, *v.style)
-		if err != nil {
-			return err
-		}
-		if v.dir == horizontal {
-			accumulatedX += child.absoluteWidth
-		}
-		if v.dir == vertical {
-			accumulatedY += child.absoluteHeight
-		}
-	}
-	return nil
+func debugf(format string, a ...any) {
+	bufferForDebug = append(bufferForDebug, fmt.Sprintf(format, a...))
 }
 
-type rect struct {
-	x      int
-	y      int
-	width  int
-	height int
+type Benchmarker struct {
+	buffer    string
+	startTime time.Time
+	lastTime  time.Time
+}
+
+var benchmarker *Benchmarker
+
+func (b *Benchmarker) start() {
+	b.buffer = ""
+	b.startTime = time.Now()
+	b.lastTime = b.startTime
+}
+
+func (b *Benchmarker) benchmark(phase string) {
+	b.buffer += fmt.Sprintf("%s: %5dμs; ", phase, time.Since(b.lastTime).Microseconds())
+	b.lastTime = time.Now()
+}
+
+func (b *Benchmarker) log() {
+	if !debugMode {
+		return
+	}
+	message := fmt.Sprintf("%stotal: %5dμs", b.buffer, time.Since(b.startTime).Microseconds())
+	b.buffer = ""
+	go log.Println(message)
 }

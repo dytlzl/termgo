@@ -2,7 +2,7 @@ package tui
 
 type config struct {
 	channel      chan any
-	focusedView  *View
+	viewPQ       priorityQueue
 	eventHandler func(any) any
 }
 

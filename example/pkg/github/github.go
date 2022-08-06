@@ -58,7 +58,7 @@ type ReadMeResult struct {
 
 type ResultItemWithOrigin struct {
 	ResultItem any
-	Origin string
+	Origin     string
 }
 
 type FooterMessage struct {
